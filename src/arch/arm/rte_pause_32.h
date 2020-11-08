@@ -20,4 +20,4 @@ static inline void rte_pause(void)
 }
 #endif
 
-#endif /* _RTE_PAUSE_ARM32_H_ */<Paste>
+#endif /* _RTE_PAUSE_ARM32_H_ */

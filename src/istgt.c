@@ -2876,9 +2876,9 @@ void *timerfn(void
 					ms = diff.tv_sec * 1000;
 					ms += diff.tv_nsec / 1000000;
 					if (ms > check_interval) {
-						ISTGT_NOTICELOG("LU:%lu "
+						ISTGT_NOTICELOG("LU:%" PRIu64
 						    "CSN:0x%x TT:%x "
-						    "OP:%2.2x:%x:%s(%lu+%u) "
+						    "OP:%2.2x:%x:%s(%" PRIu64 "+%u) "
 						    "not responded since "
 						    "%d seconds\n",
 						    lu_cmd->lun,

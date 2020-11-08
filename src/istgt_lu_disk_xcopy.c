@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
 #include <istgt_iscsi_xcopy.h>
 #include <istgt_proto.h>
 #include <istgt_misc.h>
@@ -344,7 +345,7 @@ istgt_lu_disk_process_xcopy(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr
 		sd_opcode = DGET8(&data_buf[len]);
 		if (!(sd_opcode == SEGMENT_DESCRIPTOR_B2B || sd_opcode == SEGMENT_DESCRIPTOR_B2B_OFFSET)) {
 			ISTGT_ERRLOG("c#%d SD OPCODE NOT SUPPORTED %x  \n", conn->id, sd_opcode);
-			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x09); // Refer  SCSI Primary Commands - 3 (SPC-3) 
+			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x09); // Refer  SCSI Primary Commands - 3 (SPC-3)
 			goto fail;
 		}
 
@@ -352,7 +353,7 @@ istgt_lu_disk_process_xcopy(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr
 
 		if (len+sdl > dlen) {
 			ISTGT_ERRLOG("c#%d SD data error we need to send COPY ABORTED %x  \n", conn->id, sd_opcode);
-			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x09); // Refer  SCSI Primary Commands - 3 (SPC-3) 
+			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x09); // Refer  SCSI Primary Commands - 3 (SPC-3)
 			goto fail;
 		}
 		stdi = DGET16(&data_buf[len +4]);
@@ -366,7 +367,7 @@ istgt_lu_disk_process_xcopy(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr
 			dst_offset = DGET16(&data_buf[len+30]);
 		}
 
-		cat = BGET8W(&data_buf[len+1], 0, 1); 
+		cat = BGET8W(&data_buf[len+1], 0, 1);
 		stdi = PARAMETER_HEADER_DATA + (stdi * CSCD_DESCRIPTOR_LENGTH);
 		dtdi = PARAMETER_HEADER_DATA + (dtdi * CSCD_DESCRIPTOR_LENGTH);
 
@@ -395,7 +396,7 @@ istgt_lu_disk_process_xcopy(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr
 			dst_offset = dst_lba *dst_tgt->block_len;
 			dc = BGET8W(&data_buf[len+1], 1, 1);
 		}
-		
+
 		src_tgt->lba = src_lba;
 		dst_tgt->lba = dst_lba;
 		src_tgt->offset = src_offset;
@@ -403,8 +404,8 @@ istgt_lu_disk_process_xcopy(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr
 
 		rc = istgt_lu_disk_lbxcopy(src_tgt, dst_tgt, conn, lu_cmd, dc, cat, num_of_blks_byts, sd_opcode);
 		if (rc < 0) {
-			ISTGT_ERRLOG("c#%d lu_disk_lbxcopy() failed\n", conn->id); 
-			goto fail;	
+			ISTGT_ERRLOG("c#%d lu_disk_lbxcopy() failed\n", conn->id);
+			goto fail;
 		}
 		len += sdl+4;
 		xfree(src_tgt);
@@ -448,7 +449,7 @@ istgt_lu_disk_xcopy(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 	}
 
 	/* Parameter list length truncates the prarameter data */
-	if (pll < 2) { 
+	if (pll < 2) {
 		/* PARAMETER LIST LENGTH ERROR */
 		BUILD_SENSE(ILLEGAL_REQUEST, 0x1A, 0x00);
 		lu_cmd->status = ISTGT_SCSI_STATUS_CHECK_CONDITION;
@@ -503,7 +504,7 @@ istgt_obtain_xcopy_nbytes(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, in
 	uint64_t nbytes = 0;
 	if (sd_opcode == 0x02) {
 		if (num_blks_byts == 0 && dc == 0) {
-			/* residual handle */ 
+			/* residual handle */
 		} else if (num_blks_byts == 0 && dc == 1) {
 			/* residual handle */
 		} else if (dc == 0) {
@@ -516,7 +517,7 @@ istgt_obtain_xcopy_nbytes(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, in
 	}
 	return nbytes;
 }
- 
+
 int
 istgt_lu_disk_lbxcopy(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd, int dc, int cat,  uint64_t num_blks_byts, uint8_t sd_opcode)
 {
@@ -550,14 +551,14 @@ istgt_lu_disk_lbxcopy(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, CONN_P
 		lu_cmd->data_len = 0;
 		return 0;
 	}
-		
+
 	maxlba = src_tgt->spec->blockcnt;
-	llen = (nbytes / src_tgt->block_len);	
+	llen = (nbytes / src_tgt->block_len);
 	if (src_tgt->lba >= maxlba || llen > maxlba || src_tgt->lba > (maxlba - llen)) {
 		ISTGT_ERRLOG("c#%d end of media\n", conn->id);
 		return -1;
 	}
-	
+
 
 	MTX_LOCK(&src_tgt->spec->clone_mutex);
 	clone_buf = xmalloc(nbytes);
@@ -570,7 +571,7 @@ istgt_lu_disk_lbxcopy(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, CONN_P
 		if (src_tgt->pad  == 0 && dst_tgt->pad == 0 && cat == 0) {
 			BUILD_SENSE(COPY_ABORTED, 0x26, 0x0A);	/* Copy Aborted: Unexpected Inexact Segment */
 		}
-		ISTGT_ERRLOG("c#%d lu_disk_read() failed, %d read: %ld\n", conn->id, errno, rc);
+		ISTGT_ERRLOG("c#%d lu_disk_read() failed, %d read: %" PRId64 "\n", conn->id, errno, rc);
 		return -1;
 	}
 
@@ -584,7 +585,7 @@ istgt_lu_disk_lbxcopy(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, CONN_P
 		return -1;
 	}
 
-	
+
 	if (dst_tgt->spec->lu->readonly) {
 		ISTGT_ERRLOG("c#%d LU%d: readonly unit\n", conn->id, dst_tgt->spec->lu->num);
 		xfree(clone_buf);
@@ -601,7 +602,7 @@ istgt_lu_disk_lbxcopy(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, CONN_P
 		if (src_tgt->pad  == 0 && dst_tgt->pad == 0 && cat == 0) {
 			BUILD_SENSE(COPY_ABORTED, 0x26, 0x0A);	/* Copy Aborted: Unexpected Inexact Segment */
 		}
-		ISTGT_ERRLOG("c#%d lu_disk_write() failed, %d read: %ld\n", conn->id, errno, rc);
+		ISTGT_ERRLOG("c#%d lu_disk_write() failed, %d read: %" PRId64 "\n", conn->id, errno, rc);
 		return -1;
 	}
 	xfree(clone_buf);
@@ -609,4 +610,3 @@ istgt_lu_disk_lbxcopy(ISTGT_XCOPY_TGT *src_tgt, ISTGT_XCOPY_TGT *dst_tgt, CONN_P
 
 	return 0;
 }
-

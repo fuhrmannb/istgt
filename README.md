@@ -12,7 +12,7 @@ Do ./cstyle.pl <filename with path>
 ```bash
 git checkout replication
 sudo apt-get install libssl-dev docker.io
-sudo apt-get install autoconf
+sudo apt-get install autoconf wget
 ./autogen.sh
 ./configure --enable-replication
 make cstyle

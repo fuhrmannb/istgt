@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -379,7 +380,7 @@ handle_snap_opcode(rargs_t *rargs, zvol_io_cmd_t *zio_cmd)
 	write_cnt2 = rargs->write_cnt;
 
 	if (write_cnt1 != write_cnt2) {
-		REPLICA_ERRLOG("writes still happening %lu %lu %lu\n",
+		REPLICA_ERRLOG("writes still happening %" PRIu64 " %" PRIu64 " %" PRIu64 "\n",
 		write_cnt1, write_cnt2, hdr->io_seq);
 		/*
 		 * Write IOs still happening, so, destroy snap
@@ -1303,7 +1304,7 @@ process_options(int argc, char **argv)
 	if (volsize == 0)
 		volsize = 2*1024ULL*1024ULL*1024ULL;
 
-	printf("vol name: %s volsize: %lu blocklen: %lu\n",
+	printf("vol name: %s volsize: %" PRIu64 " blocklen: %" PRIu64 "\n",
 	    vol_name, volsize, blocklen);
 	printf("total run time in seconds: %d for test_id: %d\n",
 	    total_time_in_sec, test_id);

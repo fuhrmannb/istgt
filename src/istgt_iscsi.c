@@ -342,7 +342,7 @@ istgt_iscsi_read_pdu(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 	/* read all bytes to iovec */
 	nbytes = total - ISCSI_BHS_LEN;
 	if (nbytes > 0) {
-		ISTGT_TRACELOG(ISTGT_TRACE_NET, "PDU read %d (data:%ld ahs:%lu)\n", nbytes, pdu->data_segment_len, pdu->total_ahs_len);
+		ISTGT_TRACELOG(ISTGT_TRACE_NET, "PDU read %d (data:%zu ahs:%zu)\n", nbytes, pdu->data_segment_len, pdu->total_ahs_len);
 	}
 	clock_gettime(clockid, &pdu->start);
 	errno = 0;
@@ -691,7 +691,7 @@ istgt_iscsi_write_pdu_internal(CONN_Ptr conn, ISCSI_PDU_Ptr pdu, ISTGT_LU_CMD_Pt
 
 	/* write all bytes from iovec */
 	nbytes = total;
-	ISTGT_TRACELOG(ISTGT_TRACE_NET, "PDU write %d[%lu, %lu/%lu]\n", nbytes, iovec[1].iov_len, iovec[3].iov_len, iovec[4].iov_len);
+	ISTGT_TRACELOG(ISTGT_TRACE_NET, "PDU write %d[%zu, %zu/%zu]\n", nbytes, iovec[1].iov_len, iovec[3].iov_len, iovec[4].iov_len);
 	errno = 0;
 	start = time(NULL);
 	while (nbytes > 0) {
@@ -766,12 +766,12 @@ static ISCSI_PARAM_TABLE conn_param_table[] =
 };
 
 static ISCSI_PARAM_TABLE sess_param_table[] =
-{ 
+{
 	{ "MaxConnections", "1", "1,65535", ISPT_NUMERICAL },
 #if 0
 	/* need special handling */
 	{ "SendTargets", "", "", ISPT_DECLARATIVE },
-#endif 
+#endif
 	{ "TargetName", "", "", ISPT_DECLARATIVE },
 	{ "InitiatorName", "", "", ISPT_DECLARATIVE },
 	{ "TargetAlias", "", "", ISPT_DECLARATIVE },
@@ -3491,7 +3491,7 @@ istgt_iscsi_op_scsi(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 	clock_gettime(CLOCK_MONOTONIC_RAW, &lu_cmd.start_rw_time);
 #endif
 	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		"LU%d: CSN:%x ITT:%x (%lu/%u)[0x%x %lx+%x] PG=0x%4.4x, LUN=0x%lx "
+		"LU%d: CSN:%x ITT:%x (%zu/%u)[0x%x %" PRIx64 "+%x] PG=0x%4.4x, LUN=0x%" PRIx64 " "
 		"ExpStatSN=%x StatSN=%x ExpCmdSN=%x MaxCmdSN=%x "
 		"%c%c%c%c Attr%d\n",
 		lunum, CmdSN,
@@ -3781,7 +3781,7 @@ istgt_iscsi_op_scsi(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 
 	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
 		"op_scsi_done: status:%d %s, CmdSN=%u, ExpStatSN=%u, StatSN=%u, ExpCmdSN=%u, MaxCmdSN=%u"
-		"I=%d, F=%d, R=%d, W=%d, Attr=%d, ITT=%x, TL=%u (%s %lu)\n",
+		"I=%d, F=%d, R=%d, W=%d, Attr=%d, ITT=%x, TL=%u (%s %zu)\n",
 		lu_cmd.status, que, CmdSN, ExpStatSN, c_StatSN, s_ExpCmdSN, s_MaxCmdSN,
 		I_bit, F_bit, R_bit, W_bit, Attr_bit,
 		task_tag, transfer_len, msg, data_len);
@@ -4000,7 +4000,7 @@ istgt_iscsi_op_task(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 	blockedqcount = istgt_queue_count(&spec->blocked_queue);
 
 	ISTGT_LOG("scsitask:%d start. CmdSN=0x%x, ExpStatSN=0x%x, StatSN=0x%x/0x%x, ExpCmdSN=0x%x/0x%x, MaxCmdSN=0x%x refCmdSN=0x%x (%s) "
-		"I=%d, ITT=0x%x, ref TT=0x%x cmdqcount=%d, blockedqcount=%d inflight=%d dskIOPending: %d delayedFree: %d, LUN=0x%16.16lx\n",
+		"I=%d, ITT=0x%x, ref TT=0x%x cmdqcount=%d, blockedqcount=%d inflight=%d dskIOPending: %d delayedFree: %d, LUN=0x%16.16" PRIx64 "\n",
 		function, CmdSN, ExpStatSN, cStatSN, nStatSN, sExpCmdSN, nExpCmdSN,
 		sMaxCmdSN, ref_CmdSN, msg,
 		I_bit, task_tag, ref_task_tag, cmdqcount, blockedqcount, spec->inflight, conn->diskIoPending, conn->flagDelayedFree, lun);
@@ -4172,7 +4172,7 @@ istgt_iscsi_op_task(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 		return (-1);
 	}
 	ISTGT_LOG("scsitask:%d:%s %s done. CSN=0x%x, ExpStatSN=0x%x, StatSN=0x%x/0x%x, ExpCmdSN=0x%x/0x%x, MaxCmdSN=0x%x (%s) "
-		"I=%d, ITT=0x%x, ref TT=0x%x, LUN=0x%16.16lx\n",
+		"I=%d, ITT=0x%x, ref TT=0x%x, LUN=0x%16.16" PRIx64 "\n",
 		function, fname, initport, CmdSN, ExpStatSN, cStatSN, nStatSN, sExpCmdSN, nExpCmdSN,
 		conn->sess->MaxCmdSN, msg,
 		I_bit, task_tag, ref_task_tag, lun);
@@ -4278,7 +4278,7 @@ istgt_iscsi_op_nopout(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 		rsp_pdu.data = pdu->data;
 		data_len = DMIN32(ping_len, conn->MaxRecvDataSegmentLength);
 		if ((size_t)data_len != pdu->data_segment_len) {
-			ISTGT_ERRLOG("got NOPOUT d_len:%d != rcvd_len:%lu\n", data_len, pdu->data_segment_len);
+			ISTGT_ERRLOG("got NOPOUT d_len:%d != rcvd_len:%zu\n", data_len, pdu->data_segment_len);
 		}
 		pdu->data = NULL;
 	} else {
@@ -4598,7 +4598,7 @@ istgt_iscsi_op_data(CONN_Ptr conn, ISCSI_PDU_Ptr pdu)
 	// }
 
 	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		"copy pdu.data %lu to r2ttask.iobuf at %u; pending r2t=%d, StatSN=%x, ExpStatSN=%x, DataSN=%x\n",
+		"copy pdu.data %zu to r2ttask.iobuf at %u; pending r2t=%d, StatSN=%x, ExpStatSN=%x, DataSN=%x\n",
 		data_len, buffer_offset, conn->pending_r2t, conn->StatSN, ExpStatSN, DataSN);
 
 	iondx = ++r2t_task->iobufindx;
@@ -5059,7 +5059,7 @@ istgt_iscsi_send_nopin(CONN_Ptr conn)
 	SESS_MTX_UNLOCK(conn);
 
 	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		"send NOPIN isid=%lx, tsih=%u, cid=%u StatSN=%x, ExpCmdSN=%x, MaxCmdSN=%x\n",
+		"send NOPIN isid=%" PRIx64 ", tsih=%u, cid=%u StatSN=%x, ExpCmdSN=%x, MaxCmdSN=%x\n",
 		l_isid, l_tsih, conn->cid,
 		conn->StatSN, s_ExpCmdSN, s_MaxCmdSN);
 
@@ -5610,7 +5610,7 @@ prof_log(ISTGT_LU_CMD_Ptr p, const char *caller)
 	}
 
 		if (g_logtimes == 1 && (_r.tv_sec || (_r.tv_nsec > (long)g_logdelayns))) {
-				syslog(LOG_NOTICE, "%-20.20s: %-4.4s: LU%d: CSN:0x%x TT:%x OP:%2.2x:%x:%s:%s(%lu+%u)"
+				syslog(LOG_NOTICE, "%-20.20s: %-4.4s: LU%d: CSN:0x%x TT:%x OP:%2.2x:%x:%s:%s(%" PRIu64 "+%u)"
 						" %lds.%9.9ldns [%c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld"
 						" %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld]%d flags:0x%x",
 						tinfo, caller, p->lunum, p->CmdSN, p->task_tag, p->cdb0, p->status,
@@ -5628,7 +5628,7 @@ prof_log(ISTGT_LU_CMD_Ptr p, const char *caller)
 		} else if (g_trace_flag & (ISTGT_TRACE_ISCSI | ISTGT_TRACE_PROF | ISTGT_TRACE_PROFX)) {
 				if (_r.tv_sec == 0 && _r.tv_nsec < 8000000) {
 						if (g_trace_flag & ISTGT_TRACE_PROFX)
-								syslog(LOG_NOTICE, "%-20.20s: %-4.4s: LU%d: CSN:0x%x TT:%x OP:%2.2x:%x:%s:%s(%lu+%u)"
+								syslog(LOG_NOTICE, "%-20.20s: %-4.4s: LU%d: CSN:0x%x TT:%x OP:%2.2x:%x:%s:%s(%" PRIu64 "+%u)"
 										"%ldns [%c %c %c %c %c %c %c %c]%d flags:0x%x",
 										tinfo, caller, p->lunum, p->CmdSN, p->task_tag, p->cdb0, p->status,
 										scsi_ops[istgt_cmd_table[p->cdb0].statidx], p->info, p->lba, p->lblen,
@@ -5639,7 +5639,7 @@ prof_log(ISTGT_LU_CMD_Ptr p, const char *caller)
 					p->caller[7] ? p->caller[7] : '9', p->caller[8] ? p->caller[8] : '9',
 										p->_roll_cnt, p->flags);
 				} else {
-						syslog(LOG_NOTICE, "%-20.20s: %-4.4s: LU%d: CSN:0x%x TT:%x OP:%2.2x:%x:%s:%s(%lu+%u)"
+						syslog(LOG_NOTICE, "%-20.20s: %-4.4s: LU%d: CSN:0x%x TT:%x OP:%2.2x:%x:%s:%s(%" PRIu64 "+%u)"
 										" %lds.%9.9ldns [%c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld"
 										" %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld]%d flags:0x%x",
 										tinfo, caller, p->lunum, p->CmdSN, p->task_tag, p->cdb0, p->status,
@@ -5744,7 +5744,7 @@ sender(void *arg)
 	int rc;
 	ISCSI_PDU_Ptr pdu = NULL;
 	pthread_t slf = pthread_self();
-	snprintf(tinfo, sizeof (tinfo), "s#%d.%ld.%d", conn->id, (uint64_t)(((uint64_t *)slf)[0]), ntohs(conn->iport));
+	snprintf(tinfo, sizeof (tinfo), "s#%d.%" PRId64 ".%d", conn->id, (uint64_t)(((uint64_t *)slf)[0]), ntohs(conn->iport));
 #ifdef HAVE_PTHREAD_SET_NAME_NP
 	pthread_set_name_np(slf, tinfo);
 #endif
@@ -5802,7 +5802,7 @@ sender(void *arg)
 				break;
 			}
 			ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-				"CSN:%x sender type:%d 0x%x.%lu+%u",
+				"CSN:%x sender type:%d 0x%x.%" PRIu64 "+%u",
 				lu_task->lu_cmd.CmdSN, lu_task->type,
 				lu_task->lu_cmd.cdb0, lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen);
 			lu_task->lock = 1;
@@ -5932,7 +5932,7 @@ worker(void *arg)
 	int rc;
 
 	pthread_t slf = pthread_self();
-	snprintf(tinfo, sizeof (tinfo), "c#%d.%ld.%d", conn->id, (uint64_t)(((uint64_t *)slf)[0]), ntohs(conn->iport));
+	snprintf(tinfo, sizeof (tinfo), "c#%d.%" PRId64 ".%d", conn->id, (uint64_t)(((uint64_t *)slf)[0]), ntohs(conn->iport));
 #ifdef HAVE_PTHREAD_SET_NAME_NP
 	pthread_set_name_np(slf, tinfo);
 #endif
@@ -6053,7 +6053,7 @@ worker(void *arg)
 		ISTGT_ERRLOG("pthread_create() failed\n");
 		goto cleanup_exit;
 	}
-	snprintf(conn->sthr, sizeof (conn->sthr), "s#%d.%ld.%d", conn->id, (uint64_t)(((uint64_t *)(conn->sender_thread))[0]), ntohs(conn->iport));
+	snprintf(conn->sthr, sizeof (conn->sthr), "s#%d.%" PRId64 ".%d", conn->id, (uint64_t)(((uint64_t *)(conn->sender_thread))[0]), ntohs(conn->iport));
 	conn->wsock = conn->sock;
 
 	sigemptyset(&signew);
@@ -6631,7 +6631,7 @@ istgt_create_conn(ISTGT_Ptr istgt, PORTAL_Ptr portal, int sock, struct sockaddr 
 		ISTGT_ERRLOG("pthread_create() failed\n");
 		goto error_return;
 	}
-	snprintf(conn->thr, sizeof (conn->thr), "c#%d.%ld.%d", conn->id, (uint64_t)(((uint64_t *)(conn->thread))[0]), ntohs(conn->iport));
+	snprintf(conn->thr, sizeof (conn->thr), "c#%d.%" PRId64 ".%d", conn->id, (uint64_t)(((uint64_t *)(conn->thread))[0]), ntohs(conn->iport));
 	rc = pthread_detach(conn->thread);
 	if (rc != 0) {
 		ISTGT_ERRLOG("pthread_detach() failed\n");

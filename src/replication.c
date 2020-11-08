@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
+
+#ifdef LONG_LONG_TIME_T
+#define PRI_TIME_T "lld"
+#else
+#define PRI_TIME_T "ld"
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -233,7 +241,7 @@ do {									\
 		 * processed one mgmt command.				\
 		 */							\
 		REPLICA_ERRLOG("protocol error occurred for "		\
-		    "replica(%lu)\n", replica->zvol_guid);		\
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);		\
 		_donecount = -1;					\
 		break;							\
 	}								\
@@ -270,7 +278,7 @@ do {									\
 		TAILQ_FOREACH(temp_r, &(_spec->non_quorum_rq),		\
 		    r_non_quorum_next) { 				\
 			REPLICA_NOTICELOG("Disconnecting "		\
-			    "non-quorum (%lu) as healthy: %d degraded: "\
+			    "non-quorum (%" PRIu64 ") as healthy: %d degraded: "\
 			    "%d quorum replicas are available", 	\
 			    temp_r->zvol_guid, _spec->healthy_rcount, 	\
 			    _spec->degraded_rcount);			\
@@ -348,8 +356,8 @@ check_header_sanity(zvol_io_hdr_t *resp_hdr)
 	if (resp_hdr->status != ZVOL_OP_STATUS_OK)
 		exp_len = 0;
 	if (resp_hdr->len != exp_len) {
-		REPLICA_ERRLOG("hdr->len length(%lu) is not "
-		    "matching with exp len (%lu) for opcode (%d)..\n",
+		REPLICA_ERRLOG("hdr->len length(%" PRIu64 ") is not "
+		    "matching with exp len (%" PRIu64 ") for opcode (%d)..\n",
 		    resp_hdr->len, exp_len, resp_hdr->opcode);
 		return -1;
 	}
@@ -386,7 +394,7 @@ enqueue_prepare_for_rebuild(spec_t *spec, replica_t *replica,
 
 	if (write(replica->mgmt_eventfd1, &num, sizeof (num)) != sizeof (num)) {
 		REPLICA_NOTICELOG("Failed to inform to mgmt_eventfd for "
-		    "replica(%lu) (%s:%d) mgmt_fd:%d\n", replica->zvol_guid,
+		    "replica(%" PRIu64 ") (%s:%d) mgmt_fd:%d\n", replica->zvol_guid,
 		    replica->ip, replica->port, replica->mgmt_fd);
 		ret = -1;
 		rcomm_mgmt->cmds_failed++;
@@ -528,14 +536,14 @@ start_rebuild(void *buf, replica_t *replica, uint64_t data_len)
 	if (write(replica->mgmt_eventfd1, &num, sizeof (num)) !=
 	    sizeof (num)) {
 		REPLICA_NOTICELOG("Failed to inform to mgmt_eventfd for "
-		    "replica(%lu) (%s:%d) mgmt_fd:%d\n", replica->zvol_guid,
+		    "replica(%" PRIu64 ") (%s:%d) mgmt_fd:%d\n", replica->zvol_guid,
 		    replica->ip, replica->port, replica->mgmt_fd);
 		MTX_LOCK(&replica->r_mtx);
 		clear_mgmt_cmd(replica, mgmt_cmd);
 		MTX_UNLOCK(&replica->r_mtx);
 		return (ret = -1);
 	}
-	REPLICA_LOG("start_rebuild opcode sent for Replica(%lu)"
+	REPLICA_LOG("start_rebuild opcode sent for Replica(%" PRIu64 ")"
 	    "state:%d\n", replica->zvol_guid, replica->state);
 	return ret;
 }
@@ -618,7 +626,7 @@ trigger_rebuild(spec_t *spec)
 	if (spec->rebuild_info.rebuild_in_progress == true) {
 		assert(spec->ready == true);
 		REPLICA_NOTICELOG("Rebuild is already in progress "
-		    "on volume(%s) for replica (%lu)\n", spec->volname,
+		    "on volume(%s) for replica (%" PRIu64 ")\n", spec->volname,
 		    spec->rebuild_info.dw_replica->zvol_guid);
 		return;
 	}
@@ -706,11 +714,11 @@ trigger_rebuild(spec_t *spec)
 	ret = send_prepare_for_rebuild_or_trigger_rebuild(spec,
 	    dw_replica, healthy_replica);
 	if (ret == 0) {
-		REPLICA_LOG("%s rebuild will be attempted on replica(%lu) "
+		REPLICA_LOG("%s rebuild will be attempted on replica(%" PRIu64 ") "
 		    "state:%d\n", (healthy_replica ? "Normal" : "Mesh"),
 		    dw_replica->zvol_guid, dw_replica->state);
 	} else {
-		REPLICA_ERRLOG("Failed to trigger rebuild on replica(%lu)\n",
+		REPLICA_ERRLOG("Failed to trigger rebuild on replica(%" PRIu64 ")\n",
 		    dw_replica->zvol_guid);
 	}
 }
@@ -761,7 +769,7 @@ is_replica_newly_connected(spec_t *spec, replica_t *new_replica)
 	 * then the target will not allow new session
 	 */
 	if (found && !newly_connected) {
-		REPLICA_ERRLOG("replica(%lu) has already an active session\n",
+		REPLICA_ERRLOG("replica(%" PRIu64 ") has already an active session\n",
 		    kr->zvol_guid);
 		/*
 		 * handle_mgmt_conn_error will update identified_replica status
@@ -954,7 +962,7 @@ update_trusty_replica_list(spec_t *spec, replica_t *rep, int rf) {
 
 	MTX_LOCK(&spec->rq_mtx);
 	if (rc < 0) {
-		ISTGT_ERRLOG("failed to update replica(%s:%lu) as trusty replica\n",
+		ISTGT_ERRLOG("failed to update replica(%s:%" PRIu64 ") as trusty replica\n",
 		    rep->replica_id, rep->zvol_guid);
 		return rc;
 	}
@@ -1180,7 +1188,7 @@ update_volstate(spec_t *spec)
 			spec->io_seq = max;
 		}
 		spec->ready = true;
-		REPLICA_NOTICELOG("volume(%s) is ready for IOs now.. io_seq(%lu) "
+		REPLICA_NOTICELOG("volume(%s) is ready for IOs now.. io_seq(%" PRIu64 ") "
 		    "healthy_replica(%d) degraded_replica(%d)\n",
 		    spec->volname, spec->io_seq, spec->healthy_rcount,
 		    spec->degraded_rcount);
@@ -1458,7 +1466,7 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 
 	if (strlen(replica->replica_id) == 0) {
 		REPLICA_ERRLOG("replicas(ip:%s port:%d "
-		    "guid:%lu) replica_id is empty so not permitted to connect\n",
+		    "guid:%" PRIu64 ") replica_id is empty so not permitted to connect\n",
 		    replica->ip, replica->port,
 		    replica->zvol_guid);
 		goto replica_error;
@@ -1467,7 +1475,7 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 	if (!is_replica_newly_connected(spec, replica)) {
 		MTX_UNLOCK(&spec->rq_mtx);
 		REPLICA_ERRLOG("replica(ip:%s port:%d "
-		    "guid:%lu) is not permitted to connect\n", replica->ip, replica->port,
+		    "guid:%" PRIu64 ") is not permitted to connect\n", replica->ip, replica->port,
 		    replica->zvol_guid);
 		goto replica_error;
 	}
@@ -1496,13 +1504,13 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 	    sizeof (rio_payload->volname));
 	rio_payload->replication_factor = spec->replication_factor;
 
-	REPLICA_LOG("replica(%lu) connected successfully from %s:%d rep: %d\n",
+	REPLICA_LOG("replica(%" PRIu64 ") connected successfully from %s:%d rep: %d\n",
 	    replica->zvol_guid, replica->ip, replica->port,
 	    rio_payload->replication_factor);
 
 	if (write(replica->iofd, rio_hdr, sizeof (*rio_hdr)) !=
 	    sizeof (*rio_hdr)) {
-		REPLICA_ERRLOG("failed to send io hdr to replica(%lu)\n",
+		REPLICA_ERRLOG("failed to send io hdr to replica(%" PRIu64 ")\n",
 		    replica->zvol_guid);
 		goto replica_error;
 	}
@@ -1510,26 +1518,26 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 	if (write(replica->iofd, rio_payload, sizeof (zvol_op_open_data_t)) !=
 	    sizeof (zvol_op_open_data_t)) {
 		REPLICA_ERRLOG("failed to send data-open payload to "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 		goto replica_error;
 	}
 
 	if (read(replica->iofd, rio_hdr, sizeof (*rio_hdr)) !=
 	    sizeof (*rio_hdr)) {
 		REPLICA_ERRLOG("failed to read data-open response from "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 		goto replica_error;
 	}
 
 	if (rio_hdr->status != ZVOL_OP_STATUS_OK) {
 		REPLICA_ERRLOG("data-open response is not OK for "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 		goto replica_error;
 	}
 
 	if (init_mempool(&replica->cmdq, rcmd_mempool_count, 0, 0,
 	    "replica_cmd_mempool", NULL, NULL, NULL, false)) {
-		REPLICA_ERRLOG("Failed to initialize replica(%lu) cmdq\n",
+		REPLICA_ERRLOG("Failed to initialize replica(%" PRIu64 ") cmdq\n",
 		    replica->zvol_guid);
 		goto replica_error;
 	}
@@ -1537,7 +1545,7 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 	rc = make_socket_non_blocking(iofd);
 	if (rc == -1) {
 		REPLICA_ERRLOG("make_socket_non_blocking() failed for"
-		    " replica(%lu)\n", replica->zvol_guid);
+		    " replica(%" PRIu64 ")\n", replica->zvol_guid);
 		goto replica_error;
 	}
 
@@ -1545,7 +1553,7 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 	if (can_replica_connect(spec, replica) == false) {
 		REPLICA_ERRLOG("Already healthy: %d degraded: %d non_quorum: %d "
 		    "replicas are connected.. disconnecting new replica(ip:%s port:%d "
-		    "guid:%lu) before replica thread creation\n", spec->healthy_rcount,
+		    "guid:%" PRIu64 ") before replica thread creation\n", spec->healthy_rcount,
 		    spec->degraded_rcount, get_non_quorum_replica_count(spec),
 		    replica->ip, replica->port, replica->zvol_guid);
 		MTX_UNLOCK(&spec->rq_mtx);
@@ -1558,7 +1566,7 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 		if (rc < 0) {
 			REPLICA_ERRLOG("Failed to update known trusty list... "
 			    "disconnecting new replica(ip:%s port:%d "
-			    "guid:%lu replica_id: %s)\n", replica->ip, replica->port,
+			    "guid:%" PRIu64 " replica_id: %s)\n", replica->ip, replica->port,
 			    replica->zvol_guid, replica->replica_id);
 			MTX_UNLOCK(&spec->rq_mtx);
 			goto replica_error;
@@ -1570,7 +1578,7 @@ update_replica_entry(spec_t *spec, replica_t *replica, int iofd)
 			(void *)replica);
 	if (rc != 0) {
 		REPLICA_ERRLOG("pthread_create(r_thread) failed for "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 replica_error:
 		destroy_mempool(&replica->cmdq);
 		replica->iofd = -1;
@@ -1595,7 +1603,7 @@ replica_error:
 
 	if (replica->mgmt_eventfd2 == -1) {
 		REPLICA_ERRLOG("unable to set mgmteventfd2 for more than 10 "
-		    "seconds for replica(%s:%lu)\n", replica->replica_id, replica->zvol_guid);
+		    "seconds for replica(%s:%" PRIu64 ")\n", replica->replica_id, replica->zvol_guid);
 		/*
 		 * as this function doesn't run in parallel with handle_mgmt_conn
 		 * for given replica, its fine to set these values to -1 here.
@@ -1623,7 +1631,7 @@ error_out_replica:
 
 		REPLICA_ERRLOG("Already healthy: %d degraded: %d non_quorum: %d "
 		    "replicas are connected.. disconnecting new replica(ip:%s port:%d "
-		    "guid:%lu)\n", spec->healthy_rcount, spec->degraded_rcount,
+		    "guid:%" PRIu64 ")\n", spec->healthy_rcount, spec->degraded_rcount,
 		    get_non_quorum_replica_count(spec), replica->ip, replica->port,
 		    replica->zvol_guid);
 		goto error_out_replica;
@@ -1650,7 +1658,7 @@ error_out_replica:
 			TAILQ_INSERT_TAIL(&spec->non_quorum_rq, replica, r_non_quorum_next);
 	}
 
-	ISTGT_LOG("replica(%s:%lu) connected to target with needs_update: %d can_be_trusty: %d\n",
+	ISTGT_LOG("replica(%s:%" PRIu64 ") connected to target with needs_update: %d can_be_trusty: %d\n",
 	    replica->replica_id, replica->zvol_guid, needs_update, can_be_trusty)
 
 	/* Update the volume ready state */
@@ -1693,7 +1701,7 @@ send_replica_handshake_query(replica_t *replica, spec_t *spec)
 	MTX_UNLOCK(&replica->r_mtx);
 	if (write(replica->mgmt_eventfd1, &num, sizeof (num)) != sizeof (num)) {
 		REPLICA_NOTICELOG("Failed to inform to mgmt_eventfd for "
-		    "replica(%lu) (%s:%d) mgmt_fd:%d\n", replica->zvol_guid,
+		    "replica(%" PRIu64 ") (%s:%d) mgmt_fd:%d\n", replica->zvol_guid,
 		    replica->ip, replica->port, replica->mgmt_fd);
 		ret = -1;
 		MTX_LOCK(&replica->r_mtx);
@@ -1730,8 +1738,8 @@ handle_snap_create_resp(replica_t *replica, mgmt_cmd_t *mgmt_cmd)
 		hr = replica->spec->rebuild_info.healthy_replica;
 		dr = replica->spec->rebuild_info.dw_replica;
 		if (replica == hr) {
-			REPLICA_ERRLOG("Disconnecting dw replica (%lu) "
-			   "as its healthy replica (%lu) errored snap_create\n",
+			REPLICA_ERRLOG("Disconnecting dw replica (%" PRIu64 ") "
+			   "as its healthy replica (%" PRIu64 ") errored snap_create\n",
 			    dr->zvol_guid, hr->zvol_guid);
 			inform_mgmt_conn(dr);
 		}
@@ -1774,7 +1782,7 @@ handle_snap_prepare_resp(replica_t *replica, mgmt_cmd_t *mgmt_cmd)
 			 * successful case only as in the failure case replica
 			 * will not have executed the snap prep command.
 			 */
-			REPLICA_ERRLOG("Disconnecting the replica (%lu) "
+			REPLICA_ERRLOG("Disconnecting the replica (%" PRIu64 ") "
 			   "as snap_prep opcode has been timed out\n",
 			    replica->zvol_guid);
 			inform_mgmt_conn(replica);
@@ -1823,7 +1831,7 @@ send_replica_snapshot(spec_t *spec, replica_t *replica, uint64_t io_seq,
 
 	if (write(replica->mgmt_eventfd1, &num, sizeof (num)) != sizeof (num)) {
 		REPLICA_ERRLOG("Failed to inform to mgmt_eventfd for "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 		ret = -1;
 	}
 
@@ -1865,7 +1873,7 @@ send_replica_resize_command(spec_t *spec, replica_t *replica, uint64_t size) {
 
 	if (write(replica->mgmt_eventfd1, &num, sizeof (num)) != sizeof (num)) {
 		REPLICA_ERRLOG("Failed to inform resize request to mgmt_eventfd for "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 		ret = -1;
 	}
 	return ret;
@@ -1894,15 +1902,15 @@ disconnect_nonresponding_replica(replica_t *replica, uint64_t io_seq,
 				hr = replica->spec->rebuild_info.healthy_replica;
 				dr = replica->spec->rebuild_info.dw_replica;
 				if (replica == hr) {
-					REPLICA_ERRLOG("Disconnecting dw replica (%lu) "
-					   "as its healthy replica (%lu) not responded snap_create\n",
+					REPLICA_ERRLOG("Disconnecting dw replica (%" PRIu64 ") "
+					   "as its healthy replica (%" PRIu64 ") not responded snap_create\n",
 					    dr->zvol_guid, hr->zvol_guid);
 					inform_mgmt_conn(dr);
 				}
-				REPLICA_ERRLOG("Disconnecting replica (%lu) as its not responded for"
+				REPLICA_ERRLOG("Disconnecting replica (%" PRIu64 ") as its not responded for"
 				   " snap_create\n", replica->zvol_guid);
 			} else if (opcode == ZVOL_OPCODE_SNAP_PREPARE) {
-				REPLICA_ERRLOG("Disconnecting the replica (%lu) "
+				REPLICA_ERRLOG("Disconnecting the replica (%" PRIu64 ") "
 				   "as snap_prep opcode has been timed out\n",
 				    replica->zvol_guid);
 			}
@@ -2098,7 +2106,7 @@ int istgt_lu_create_snapshot(spec_t *spec, char *snapname, int io_wait_time, int
 	rcommon_mgmt_cmd_t *rmgmt = allocate_rcommon_mgmt_cmd(0);
 	replica_t *hr = spec->rebuild_info.healthy_replica;
 	if (hr) {
-		REPLICA_LOG("sending SNAP_PREP to Replica(%lu)\n", hr->zvol_guid);
+		REPLICA_LOG("sending SNAP_PREP to Replica(%" PRIu64 ")\n", hr->zvol_guid);
 		(void) send_replica_snapshot(spec, hr, io_seq, snapname, ZVOL_OPCODE_SNAP_PREPARE, rmgmt);
 
 		sent = rmgmt->cmds_sent;
@@ -2150,7 +2158,7 @@ int istgt_lu_create_snapshot(spec_t *spec, char *snapname, int io_wait_time, int
 	spec->quiesce = 0;
 	MTX_UNLOCK(&spec->rq_mtx);
 
-	REPLICA_LOG("snap %s create ioseq: %lu resp: %s successcnt: %d\n", snapname, io_seq,
+	REPLICA_LOG("snap %s create ioseq: %" PRIu64 " resp: %s successcnt: %d\n", snapname, io_seq,
 	    (r == true) ? "success" : "failed/timedout", success);
 	return (ret);
 }
@@ -2173,7 +2181,7 @@ istgt_lu_resize_volume(spec_t *spec, uint64_t size) {
 	spec->blockcnt = (size / spec->blocklen);
 
 	MTX_UNLOCK(&spec->rq_mtx);
-	ISTGT_LOG("Resized the volume from %lu to %lu io_seq: %lu\n", old_size, size, spec->io_seq);
+	ISTGT_LOG("Resized the volume from %" PRIu64 " to %" PRIu64 " io_seq: %" PRIu64 "\n", old_size, size, spec->io_seq);
 	// TODO: Need to handle response from replicas and decide whether we need to resize to
 	// older size in case of cf number of response are not received
 	return true;
@@ -2273,7 +2281,7 @@ istgt_lu_remove_unknown_replica(spec_t *spec, int drf, char **known_replica_id_l
 
 	// Find the replica who's replicaID is not exist in known_replica_id_list
 	TAILQ_FOREACH(replica, &spec->rq, r_next) {
-		/* No need of taking replica->r_mtx lock since we took 
+		/* No need of taking replica->r_mtx lock since we took
 		 * lock on spec->rq_mtx it is good enough to read replica_id
 		 * properity.
 		 */
@@ -2342,7 +2350,7 @@ istgt_lu_remove_unknown_replica(spec_t *spec, int drf, char **known_replica_id_l
 		// Marking replica as cordon(not ready to serve IOs)
 		removing_replica->cordon = 1;
 		MTX_UNLOCK(&removing_replica->r_mtx);
-		REPLICA_LOG("Replica(%s:%lu) marked cordoned for IOs\n",
+		REPLICA_LOG("Replica(%s:%" PRIu64 ") marked cordoned for IOs\n",
 		    removing_replica->replica_id, removing_replica->zvol_guid);
 	}
 
@@ -2535,7 +2543,7 @@ send_replica_query(replica_t *replica, spec_t *spec, zvol_op_code_t opcode)
 		ret = send_replica_query(replica, spec, OPCODE);			\
 		if (ret == -1) {							\
 			REPLICA_ERRLOG("Failed to send mgmtIO for querying "		\
-			    "status on replica(%lu) ..\n", replica->zvol_guid);		\
+			    "status on replica(%" PRIu64 ") ..\n", replica->zvol_guid);		\
 			MTX_UNLOCK(&spec->rq_mtx);					\
 			handle_mgmt_conn_error(replica, 0, NULL, 0);			\
 			MTX_LOCK(&spec->rq_mtx);					\
@@ -2617,11 +2625,11 @@ handle_prepare_for_rebuild_resp(spec_t *spec, zvol_io_hdr_t *hdr,
 			ret = start_rebuild(rebuild_req_buf, dw_replica,
 			    sizeof(rebuild_req_t) * success_cnt);
 			if (ret == 0) {
-				REPLICA_LOG("Rebuild triggered on Replica(%s:%lu) "
+				REPLICA_LOG("Rebuild triggered on Replica(%s:%" PRIu64 ") "
 				    "state:%d\n", dw_replica->replica_id, dw_replica->zvol_guid,
 				    dw_replica->state);
 			} else {
-				REPLICA_LOG("Unable to start rebuild on Replica(%s:%lu)"
+				REPLICA_LOG("Unable to start rebuild on Replica(%s:%" PRIu64 ")"
 				    " state:%d\n", dw_replica->replica_id, dw_replica->zvol_guid,
 				    dw_replica->state);
 				spec->scalingup_replica = NULL;
@@ -2642,7 +2650,7 @@ handle_prepare_for_rebuild_resp(spec_t *spec, zvol_io_hdr_t *hdr,
 		mgmt_cmd->rcomm_mgmt = NULL;
 		MTX_LOCK(&spec->rq_mtx);
 		if (spec->rebuild_info.dw_replica)
-			REPLICA_LOG("Unable to prepare rebuild for Replica(%lu) "
+			REPLICA_LOG("Unable to prepare rebuild for Replica(%" PRIu64 ") "
 			    "state:%d\n",
 			    spec->rebuild_info.dw_replica->zvol_guid,
 			    spec->rebuild_info.dw_replica->state);
@@ -2708,16 +2716,16 @@ wait_for_ongoing_ios_on_replica(spec_t *spec, replica_t *replica, int sec) {
 		}
 		if (!io_found) {
 			ret = 0;
-			ISTGT_LOG("Successfully flushed the IO's from replica(%s:%lu) queue\n",
+			ISTGT_LOG("Successfully flushed the IO's from replica(%s:%" PRIu64 ") queue\n",
 			    replica->replica_id, replica->zvol_guid);
 			break;
 		}
 
 		MTX_UNLOCK(&spec->rq_mtx);
 
-		ISTGT_LOG("Waiting for IO's to flush on replica(%s:%lu) "
-		    "spec write_io_cnt: %lu and sync_io_cnt: %lu replica "
-		    "write_io_cnt: %lu sync_io_cnt: %lu\n",
+		ISTGT_LOG("Waiting for IO's to flush on replica(%s:%" PRIu64 ") "
+		    "spec write_io_cnt: %" PRIu64 " and sync_io_cnt: %" PRIu64 " replica "
+		    "write_io_cnt: %" PRIu64 " sync_io_cnt: %" PRIu64 "\n",
 		    replica->replica_id, replica->zvol_guid,
 		    spec->inflight_write_io_cnt, spec->inflight_sync_io_cnt,
 		    replica->replica_inflight_write_io_cnt, replica->replica_inflight_sync_io_cnt);
@@ -2857,7 +2865,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 	}
 	repl_status = (zrepl_status_ack_t *)replica->mgmt_io_resp_data;
 
-	REPLICA_ERRLOG("Replica(%lu) state:%d rebuild status:%d\n",
+	REPLICA_ERRLOG("Replica(%" PRIu64 ") state:%d rebuild status:%d\n",
 	    replica->zvol_guid, repl_status->state,
 	    repl_status->rebuild_status);
 
@@ -2870,7 +2878,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 	last_state = replica->state;
 
 	if(last_state != repl_status->state) {
-		REPLICA_NOTICELOG("Replica(%lu) (%s:%d) mgmt_fd:%d state "
+		REPLICA_NOTICELOG("Replica(%" PRIu64 ") (%s:%d) mgmt_fd:%d state "
 		    "changed from %s to %s\n", replica->zvol_guid, replica->ip,
 		    replica->port, replica->mgmt_fd,
 		    (last_state == ZVOL_STATUS_HEALTHY) ? "healthy" :
@@ -2926,7 +2934,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 					}
 				}
 				if (is_replica_exist == false) {
-					ISTGT_ERRLOG("successfully updated unkown replica(%s:%lu) "
+					ISTGT_ERRLOG("successfully updated unkown replica(%s:%" PRIu64 ") "
 					    "but no longer exist in unknown list\n",
 					     replica->replica_id, replica->zvol_guid);
 					goto cleanup;
@@ -2935,7 +2943,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 				// retry
 				if (ret < 0) {
 					MTX_UNLOCK(&spec->rq_mtx);
-					ISTGT_ERRLOG("will retry again to transform replica(%s:%lu) from "
+					ISTGT_ERRLOG("will retry again to transform replica(%s:%" PRIu64 ") from "
 					    "unknown to trusty\n", replica->replica_id,
 					    replica->zvol_guid);
 					return 0;
@@ -2943,7 +2951,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 
 				// error to disconnect
 				if (ret > 0) {
-					ISTGT_ERRLOG("disconnecting unknown replica(%s:%lu) during "
+					ISTGT_ERRLOG("disconnecting unknown replica(%s:%" PRIu64 ") during "
 					    "transformation from unknown to trusty... desired "
 					    "replication factor %d replication factor %d\n",
 					    replica->replica_id, replica->zvol_guid,
@@ -2953,7 +2961,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 					goto cleanup;
 				}
 
-				ISTGT_LOG("successfully transformed replica(%s:%lu) from "
+				ISTGT_LOG("successfully transformed replica(%s:%" PRIu64 ") from "
 				    " unkown to trusty replica replication factor %d consistency "
 				    " factor %d desired replication factor %d\n",
 				    replica->replica_id, replica->zvol_guid,
@@ -2967,7 +2975,7 @@ update_replica_status(spec_t *spec, zvol_io_hdr_t *hdr, replica_t *replica)
 			replica->state = (replica_state_t) repl_status->state;
 			replica->quorum = 1;
 			MTX_UNLOCK(&replica->r_mtx);
-			REPLICA_ERRLOG("Replica(%lu) marked healthy,"
+			REPLICA_ERRLOG("Replica(%" PRIu64 ") marked healthy,"
 		    	    " seting master_replica to NULL\n",
 			    replica->zvol_guid);
 			/* Error our if already quorum replicas are connected */
@@ -3246,7 +3254,7 @@ write_io_data(replica_t *replica, io_event_t *wevent)
 			break;
 		default:
 			REPLICA_ERRLOG("got invalid write state(%d) for "
-			    "replica(%lu).. aborting..\n", *state,
+			    "replica(%" PRIu64 ").. aborting..\n", *state,
 			    replica->zvol_guid);
                         abort();
 			break;
@@ -3373,7 +3381,7 @@ read_io_resp_hdr:
 
 				default:
 					REPLICA_ERRLOG("unsupported opcode"
-					    "(%d) received for replica(%lu)\n",
+					    "(%d) received for replica(%" PRIu64 ")\n",
 					    resp_hdr->opcode,
 					    replica->zvol_guid);
 					break;
@@ -3391,7 +3399,7 @@ read_io_resp_hdr:
 			break;
 		default:
 			REPLICA_ERRLOG("got invalid read state(%d) for "
-			    "replica(%lu).. aborting..\n", *state,
+			    "replica(%" PRIu64 ").. aborting..\n", *state,
 			    replica->zvol_guid);
 			abort();
 			break;
@@ -3423,7 +3431,7 @@ handle_write_data_event(replica_t *replica)
 		mgmt_cmd->mgmt_cmd_state != WRITE_IO_SEND_DATA) {
 		MTX_UNLOCK(&replica->r_mtx);
 		REPLICA_DEBUGLOG("write IO is in wait state on mgmt "
-		    "connection.. for replica(%lu)\n", replica->zvol_guid);
+		    "connection.. for replica(%" PRIu64 ")\n", replica->zvol_guid);
 		return rc;
 	}
 
@@ -3450,7 +3458,7 @@ inform_data_conn(replica_t *r)
 	r->disconnect_conn = 1;
 	if (write(r->mgmt_eventfd2, &num, sizeof (num)) != sizeof (num))
 		REPLICA_NOTICELOG("Failed to inform err to data_conn for "
-		    "replica(%lu) (%s:%d) mgmt_fd:%d\n", r->zvol_guid, r->ip,
+		    "replica(%" PRIu64 ") (%s:%d) mgmt_fd:%d\n", r->zvol_guid, r->ip,
 		    r->port, r->mgmt_fd);
 }
 
@@ -3525,7 +3533,7 @@ empty_mgmt_q_of_replica(replica_t *r)
 					break;
 			}
 			REPLICA_NOTICELOG("mgmt command(%d) failed for "
-			    "replica(%lu) (%s:%d) mgmt_fd:%d\n",
+			    "replica(%" PRIu64 ") (%s:%d) mgmt_fd:%d\n",
 			    mgmt_cmd->io_hdr->opcode, r->zvol_guid, r->ip,
 			    r->port, r->mgmt_fd);
 		}
@@ -3690,14 +3698,14 @@ check_for_command_completion(spec_t *spec, rcommon_cmd_t *rcomm_cmd, ISTGT_LU_CM
 			 */
 			rc = -1;
 			REPLICA_ERRLOG("didn't receive success from replica.."
-			    " cmd:read io(%lu) cs(%d)\n", rcomm_cmd->io_seq,
+			    " cmd:read io(%" PRIu64 ") cs(%d)\n", rcomm_cmd->io_seq,
 			    rcomm_cmd->copies_sent);
 		} else if ((rcomm_cmd->copies_sent - failure) < min_response) {
 			/*
 			 * In this case, we will avoid waiting for replicas
 			 * which haven't sent response yet.
 			 */
-			REPLICA_ERRLOG("got error from %d replicas.. io(%lu)"
+			REPLICA_ERRLOG("got error from %d replicas.. io(%" PRIu64 ")"
 			    "cs(%d)\n", failure, rcomm_cmd->io_seq,
 			    rcomm_cmd->copies_sent);
 			rc = -1;
@@ -3751,7 +3759,7 @@ check_for_command_completion(spec_t *spec, rcommon_cmd_t *rcomm_cmd, ISTGT_LU_CM
 		} else if (response_received == copies_sent) {
 			rc = -1;
 			REPLICA_ERRLOG("didn't receive success from replica.."
-			    " cmd:write io(%lu) cs(%d)\n", rcomm_cmd->io_seq,
+			    " cmd:write io(%" PRIu64 ") cs(%d)\n", rcomm_cmd->io_seq,
 			    rcomm_cmd->copies_sent);
 		}
 	}
@@ -3917,12 +3925,12 @@ retry_read:
 				if (replica_exists) {
 					inform_mgmt_conn(resp_replica);
 					REPLICA_ERRLOG("Disconnecting "
-					    "replica(%lu) due to "
-					    "timeout(%ld)\n",
+					    "replica(%" PRIu64 ") due to "
+					    "timeout(%" PRI_TIME_T ")\n",
 					    resp_replica->zvol_guid,
 					    diff.tv_sec);
 				} else {
-					REPLICA_ERRLOG("Replica(%lu) already "
+					REPLICA_ERRLOG("Replica(%" PRIu64 ") already "
 					    "removed\n",
 					    resp_replica->zvol_guid);
 				}
@@ -4035,7 +4043,7 @@ handle_mgmt_conn_error(replica_t *r, int sfd, struct epoll_event *events, int ev
 		}
 		if (r->mgmt_eventfd2 != -1) {
 			REPLICA_NOTICELOG("Informing data connection for error "
-			    "in replica(%lu)\n", r->zvol_guid);
+			    "in replica(%" PRIu64 ")\n", r->zvol_guid);
 			inform_data_conn(r);
 		}
 	} else {
@@ -4064,7 +4072,7 @@ handle_mgmt_conn_error(replica_t *r, int sfd, struct epoll_event *events, int ev
 	r->mgmt_eventfd1 = -1;
 	close_fd(epollfd, mgmt_eventfd1);
 
-	REPLICA_NOTICELOG("Replica(%s:%lu) got disconnected from %s:%d "
+	REPLICA_NOTICELOG("Replica(%s:%" PRIu64 ") got disconnected from %s:%d "
 	    "mgmt_fd:%d\n", r->replica_id, r->zvol_guid, r->ip, r->port,
 	    r->mgmt_fd);
 
@@ -4086,13 +4094,13 @@ handle_mgmt_conn_error(replica_t *r, int sfd, struct epoll_event *events, int ev
 				events[i].data.ptr = NULL;
 			} else
 				REPLICA_ERRLOG("unexpected fd(%d) for "
-				    "replica(%lu)\n", mevent->fd, r->zvol_guid);
+				    "replica(%" PRIu64 ")\n", mevent->fd, r->zvol_guid);
 		}
 	}
 
 	MTX_LOCK(&r->spec->rq_mtx);
 	if (r->spec->rebuild_info.dw_replica == r) {
-		REPLICA_ERRLOG("Replica(%lu) was under rebuild,"
+		REPLICA_ERRLOG("Replica(%" PRIu64 ") was under rebuild,"
 		    " seting master_replica to NULL\n",
 		    r->zvol_guid);
 		r->spec->scalingup_replica = NULL;
@@ -4128,7 +4136,7 @@ handle_mgmt_event_fd(replica_t *replica)
 	if (replica->disconnect_conn == 1) {
 		MTX_UNLOCK(&replica->r_mtx);
 		REPLICA_ERRLOG("Got disconnect from data connection for "
-		    "replica(%lu)\n",  replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n",  replica->zvol_guid);
 		return rc;
 	}
 	MTX_UNLOCK(&replica->r_mtx);
@@ -4160,7 +4168,7 @@ handle_read_data_event(replica_t *replica)
 		 * manner. So we will print error message and does cleanup
 		 */
 		REPLICA_ERRLOG("unexpected read IO on mgmt connection.. for "
-		    "replica(%lu)\n", replica->zvol_guid);
+		    "replica(%" PRIu64 ")\n", replica->zvol_guid);
 		return (-1);
 	}
 
@@ -4356,7 +4364,7 @@ initialize_replication()
 		    NULL, 10);
 	if (max_wait_time > 30) {
 		ISTGT_NOTICELOG("changing IO max wait time "
-		    "from %ld to %d", io_max_wait_time,
+		    "from %" PRId64 " to %d", io_max_wait_time,
 		    max_wait_time);
 		io_max_wait_time = max_wait_time;
 	}
@@ -4598,8 +4606,8 @@ void
 istgt_set_max_io_wait_time(uint64_t new_io_wait_time)
 {
 	if (new_io_wait_time != io_max_wait_time) {
-		REPLICA_NOTICELOG("Max IO wait time updated to %lu seconds"
-		    " from %lu seconds \n", new_io_wait_time, io_max_wait_time);
+		REPLICA_NOTICELOG("Max IO wait time updated to %" PRIu64 " seconds"
+		    " from %" PRIu64 " seconds \n", new_io_wait_time, io_max_wait_time);
 		io_max_wait_time = new_io_wait_time;
 	}
 	return;

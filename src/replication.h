@@ -208,7 +208,7 @@ void ask_replica_status(spec_t *spec, replica_t *replica);
 extern void * replica_thread(void *);
 extern int do_drainfd(int);
 void close_fd(int epollfd, int fd);
-int64_t perform_read_write_on_fd(int fd, uint8_t *data, uint64_t len,
+ssize_t perform_read_write_on_fd(int fd, uint8_t *data, uint64_t len,
     int state);
 int initialize_volume(spec_t *spec, int, int, int);
 void destroy_volume(spec_t *spec);

@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
+
+#ifdef LONG_LONG_TIME_T
+#define PRI_TIME_T "lld"
+#else
+#define PRI_TIME_T "ld"
+#endif
+
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/prctl.h>
@@ -99,8 +107,8 @@ int replica_timeout = REPLICA_DEFAULT_TIMEOUT;
 			    RECEIVED_ERR;				\
 			pthread_cond_signal(_cond);			\
 		} else {						\
-			REPLICA_DEBUGLOG("error set for command(%lu)"	\
-			    " for replica(%lu)\n",			\
+			REPLICA_DEBUGLOG("error set for command(%" PRIu64 ")"	\
+			    " for replica(%" PRIu64 ")\n",			\
 			    rcomm_cmd->io_seq, r->zvol_guid);		\
 			rcomm_cmd->resp_list[idx].status |= 		\
 			    RECEIVED_ERR;				\
@@ -124,7 +132,7 @@ int replica_timeout = REPLICA_DEFAULT_TIMEOUT;
 			    pending_cmd->start_time, nw, _diff);	\
 			if (_diff.tv_sec >= replica_timeout) {		\
 				REPLICA_ERRLOG("timeout happened for "	\
-				    "replica(%lu).. delay(%lu sec)\n", 	\
+				    "replica(%" PRIu64 ").. delay(%" PRI_TIME_T " sec)\n", 	\
 				    r->zvol_guid, _diff.tv_sec); 	\
 				_ret = -1;				\
 				goto _exit_label;			\
@@ -133,10 +141,10 @@ int replica_timeout = REPLICA_DEFAULT_TIMEOUT;
 				ms += _diff.tv_nsec / 1000000;		\
 				if (ms >				\
 				    (wait_count * polling_timeout)) {	\
-					REPLICA_NOTICELOG("replica(%lu)"\
+					REPLICA_NOTICELOG("replica(%" PRIu64 ")"\
 					    " hasn't responded in last "\
 					    "%d seconds for opcode: %d"	\
-					    " with seq: %lu\n",		\
+					    " with seq: %" PRIu64 "\n",		\
 					    r->zvol_guid, ms / 1000,	\
 					    pending_cmd->opcode,	\
 					    pending_cmd->io_seq);	\
@@ -217,7 +225,7 @@ inform_mgmt_conn(replica_t *r)
 	r->disconnect_conn = 1;
 	if (write(r->mgmt_eventfd1, &num, sizeof (num)) != sizeof (num))
 		REPLICA_NOTICELOG("Failed to report err to mgmt_conn for "
-		    "replica(%lu) (%s:%d) mgmt_fd%d\n", r->zvol_guid, r->ip,
+		    "replica(%" PRIu64 ") (%s:%d) mgmt_fd%d\n", r->zvol_guid, r->ip,
 		    r->port, r->mgmt_fd);
 }
 
@@ -264,11 +272,11 @@ respond_with_error_for_all_outstanding_ios(replica_t *r)
 	SEND_ERROR_RESPONSES((&(r->blockedq)), r, cond_var, blocked_cnt,
 	    blocked_diff, read_cnt, write_cnt);
 
-	REPLICA_ERRLOG("IO command set with error for replica(%lu) .."
-	    "sent command(count:%d delay:%lu), "
-	    "queued command(count:%d delay:%lu), "
-	    "blocked command(count:%d delay:%lu).. "
-	    " read_error(%lu) write_error(%lu)\n",
+	REPLICA_ERRLOG("IO command set with error for replica(%" PRIu64 ") .."
+	    "sent command(count:%d delay:%" PRI_TIME_T "), "
+	    "queued command(count:%d delay:%" PRI_TIME_T "), "
+	    "blocked command(count:%d delay:%" PRI_TIME_T ").. "
+	    " read_error(%" PRIu64 ") write_error(%" PRIu64 ")\n",
 	    r->zvol_guid, wait_cnt, wait_diff.tv_sec, ready_cnt,
 	    ready_diff.tv_sec, blocked_cnt, blocked_diff.tv_sec,
 	    read_cnt, write_cnt);
@@ -375,7 +383,7 @@ handle_data_conn_error(replica_t *r)
 	r->conn_closed++;
 	if (r->conn_closed != 2) {
 		REPLICA_NOTICELOG("Informing mgmt connection for error in "
-		    "replica(%lu)\n", r->zvol_guid);
+		    "replica(%" PRIu64 ")\n", r->zvol_guid);
 		inform_mgmt_conn(r);
 		pthread_cond_wait(&r->r_cond, &r->r_mtx);
 	}
@@ -407,8 +415,8 @@ find_replica_cmd(replica_t *r, uint64_t ioseq)
 		if (cmd->io_seq == ioseq)
 			return cmd;
 	}
-	REPLICA_ERRLOG("Failed to find seq number(%lu) in "
-	    "replica(%lu)'s waitq\n", ioseq, r->zvol_guid);
+	REPLICA_ERRLOG("Failed to find seq number(%" PRIu64 ") in "
+	    "replica(%" PRIu64 ")'s waitq\n", ioseq, r->zvol_guid);
 	return NULL;
 }
 
@@ -440,7 +448,7 @@ read_cmd(replica_t *r)
 
 			if (resp_hdr->status != ZVOL_OP_STATUS_OK) {
 				REPLICA_ERRLOG("Received status(%d) for opcode(%d) "
-				    "and seq number(%lu) for replica(%lu)\n", resp_hdr->status,
+				    "and seq number(%" PRIu64 ") for replica(%" PRIu64 ")\n", resp_hdr->status,
 				    resp_hdr->opcode, resp_hdr->io_seq, r->zvol_guid);
 				return -1;
 			}
@@ -479,7 +487,7 @@ read_cmd(replica_t *r)
 			return READ_COMPLETED;
 		default:
 			REPLICA_ERRLOG("got invalid read state(%d) for "
-			    "replica(%lu).. aborting..\n", state,
+			    "replica(%" PRIu64 ").. aborting..\n", state,
 			    r->zvol_guid);
 			abort();
 			break;
@@ -671,7 +679,7 @@ handle_mgmt_eventfd(void *arg)
 {
 	replica_t *r = (replica_t *) arg;
 	if (r->disconnect_conn > 0) {
-		REPLICA_ERRLOG("Disconnecting data connection for replica(%lu)\n", r->zvol_guid);
+		REPLICA_ERRLOG("Disconnecting data connection for replica(%" PRIu64 ")\n", r->zvol_guid);
 		return -1;
 	}
 	return 0;
@@ -691,7 +699,7 @@ replica_thread(void *arg)
 	int wait_count = 1;
 	pthread_t self = pthread_self();
 
-	snprintf(tinfo, sizeof tinfo, "r#%d.%lu", (int)(((uint64_t *)self)[0]), r->zvol_guid);
+	snprintf(tinfo, sizeof tinfo, "r#%d.%" PRIu64, (int)(((uint64_t *)self)[0]), r->zvol_guid);
 
 	r_data_eventfd = eventfd(0, EFD_NONBLOCK);
 	if (r_data_eventfd < 0) {
@@ -809,13 +817,13 @@ initialize_error:
 			ptr = events[i].data.ptr;
 			if (ptr != NULL) {
 				REPLICA_ERRLOG("event.data.ptr != NULL.. This "
-				    "should not happen.. r(%lu)!\n", r->zvol_guid);
+				    "should not happen.. r(%" PRIu64 ")!\n", r->zvol_guid);
 				goto exit;
 			}
 
 			if (events[i].events & (EPOLLERR | EPOLLRDHUP | EPOLLHUP)) {
 				REPLICA_ERRLOG("Received event(%d) on fd(%d) "
-				    "for replica(%lu)\n", events[i].events,
+				    "for replica(%" PRIu64 ")\n", events[i].events,
 				    events[i].data.fd, r->zvol_guid);
 				goto exit;
 			}

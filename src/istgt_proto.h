@@ -107,7 +107,7 @@ ISTGT_LU_Ptr istgt_lu_find_target(ISTGT_Ptr istgt, const char *target_name);
 ISTGT_LU_Ptr istgt_lu_find_target_by_volname(ISTGT_Ptr istgt, const char *target_name);
 #ifdef	REPLICATION
 int istgt_lu_create_snapshot(spec_t *spec, char *snapname, int, int);
-int istgt_lu_resize_volume(spec_t *spec, size_t size);
+int istgt_lu_resize_volume(spec_t *spec, uint64_t size);
 int istgt_lu_remove_unknown_replica(spec_t *spec, int drf, char **replicas_id);
 int istgt_lu_destroy_snapshot(spec_t *spec, char *snapname);
 void istgt_lu_mempool_stats(char **resp);
@@ -317,4 +317,3 @@ istgt_lu_set_state(ISTGT_LU_Ptr lu, ISTGT_STATE state)
 #endif /* USE_ATOMIC */
 
 #endif /* ISTGT_PROTO_H */
-

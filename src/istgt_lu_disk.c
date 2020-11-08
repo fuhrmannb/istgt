@@ -48,6 +48,12 @@
 #include <inttypes.h>
 #include <stdint.h>
 
+#ifdef LONG_LONG_TIME_T
+#define PRI_TIME_T "lld"
+#else
+#define PRI_TIME_T "ld"
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -195,7 +201,7 @@ macroname:
 
 #define errlog(lu_cmd, fmt, ...)						\
 {														\
-	syslog(LOG_ERR, "%-18.18s:%4d: %-8.8s: [%u.%x lba%lu+%u %c.%ld.%ld %c.%ld.%ld]" fmt,		   \
+	syslog(LOG_ERR, "%-18.18s:%4d: %-8.8s: [%u.%x lba%" PRIu64 "+%u %c.%" PRI_TIME_T ".%" PRI_TIME_T " %c.%" PRI_TIME_T ".%" PRI_TIME_T "]" fmt,		   \
 			__func__, __LINE__, tinfo, lu_cmd->CmdSN, lu_cmd->cdb[0], lu_cmd->lba, lu_cmd->lblen,  \
 			lu_cmd->caller[lu_cmd->_andx > 1 ? lu_cmd->_andx - 2 : 0],        \
 			lu_cmd->tdiff[lu_cmd->_andx > 1 ? lu_cmd->_andx - 2 : 0].tv_sec,  \
@@ -286,7 +292,7 @@ find_first_bit(ISTGT_LU_CMD_Ptr lu_cmd)
 		res_final += res;
 		if ((unsigned long)res != nbits << 6)
 			return res_final;
-	}	
+	}
 	return res_final;
 }
 static int
@@ -476,13 +482,13 @@ istgt_lu_disk_close(ISTGT_LU_Ptr lu, int i)
 	spec->ex_state = ISTGT_LUN_CLOSE_INPROGRESS;
 	MTX_UNLOCK(&spec->state_mutex);
 	disk_ref = spec->ludsk_ref;
-	
+
 	timesdiff(clockid, spec->close_started, _wrkx, _s1)
 #ifndef	REPLICATION
 	if (!spec->lu->readonly) {
 		rc = spec->sync(spec, 0, spec->size);
 		timesdiff(clockid, _wrkx, _wrk, _s2)
-		if (rc < 0) { 
+		if (rc < 0) {
 			/* Ignore error */
 			ISTGT_ERRLOG("LU%d: LUN%d: failed to sync\n", lu->num, i);
 		}
@@ -518,7 +524,7 @@ istgt_lu_disk_close(ISTGT_LU_Ptr lu, int i)
 	spec->npr_keys = 0;
 	for (i = 0; i < MAX_LU_RESERVE; i++) {
 		memset(&spec->pr_keys[i], 0, sizeof(spec->pr_keys[i]));
-	} 
+	}
 	MTX_UNLOCK(&spec->pr_rsv_mutex);
 
 	TAILQ_FOREACH(nexus, &spec->nexus, nexus_next) {
@@ -531,7 +537,7 @@ istgt_lu_disk_close(ISTGT_LU_Ptr lu, int i)
 	MTX_UNLOCK(&spec->state_mutex);
 	lu->limit_q_size = 0;
 
-	ISTGT_LOG("LU%d: LUN%d %s: storage_offline, holds:%d [%ld.%ld - %ld.%ld - %ld.%ld]\n",
+	ISTGT_LOG("LU%d: LUN%d %s: storage_offline, holds:%d [%" PRI_TIME_T ".%" PRI_TIME_T " - %" PRI_TIME_T ".%" PRI_TIME_T " - %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 			lu->num, i, lu->name ? lu->name  : "-", disk_ref,
 			_s1.tv_sec, _s1.tv_nsec, _s2.tv_sec, _s2.tv_nsec, _s3.tv_sec, _s3.tv_nsec);
 	return 0;
@@ -562,24 +568,24 @@ istgt_lu_disk_post_open(ISTGT_LU_DISK *spec)
 	if (spec->rsize == 0) {
 		//TODO
 #ifndef	REPLICATION
-		#ifdef __FreeBSD__	
+		#ifdef __FreeBSD__
 		off_t rsize = 0;
 		uint32_t lbPerRecord = 0;
 		rc = ioctl(spec->fd, DIOCGSTRIPESIZE, &rsize);
 		if (rc != -1) {
-			ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%lu \n", lu->num, i, rsize);
+			ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%" PRIu64 " \n", lu->num, i, rsize);
 			spec->rsize = rsize;
 			if (spec->rsize > spec->blocklen) {
 				lbPerRecord = spec->rsize / ((uint32_t)(spec->blocklen));
 				spec->lb_per_rec = lbPerRecord;
 				spec->rshiftreal = fls(lbPerRecord) - 1;
 				if (lbPerRecord & (lbPerRecord-1)) {
-					ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%lu zfsrecordSize:%u\n",
+					ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%" PRIu64 " zfsrecordSize:%u\n",
 								lu->num, i, spec->blocklen, spec->rsize);
 				}
 			}
 		} else {
-			ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%lu failed:%d %d\n", lu->num, i, rsize, rc, errno);
+			ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%" PRIu64 " failed:%d %d\n", lu->num, i, rsize, rc, errno);
 		}
 		#endif
 #endif
@@ -698,7 +704,7 @@ istgt_lu_disk_open(ISTGT_LU_Ptr lu, int i)
 			spec->lb_per_rec = lbPerRecord;
 			spec->rshiftreal = fls(lbPerRecord) - 1;
 			if (lbPerRecord & (lbPerRecord-1)) {
-				ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%lu zfsrecordSize:%u\n",
+				ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%" PRIu64 " zfsrecordSize:%u\n",
 						lu->num, i, spec->blocklen, spec->rsize);
 			}
 		}
@@ -717,7 +723,7 @@ istgt_lu_disk_open(ISTGT_LU_Ptr lu, int i)
 			//	spec->ex_state = ISTGT_LUN_CLOSE;
 			//	MTX_UNLOCK(&spec->state_mutex);
 			//}
-	
+
 		}
 
 		spec->fd = -1;
@@ -754,7 +760,7 @@ istgt_lu_disk_open(ISTGT_LU_Ptr lu, int i)
 
 		gb_size = spec->size / ISTGT_LU_1GB;
 		mb_size = (spec->size % ISTGT_LU_1GB) / ISTGT_LU_1MB;
- 		printf("LU%d: LUN%d %s: storage_onlinex %s [%s, %luGB.%luMB, %lu blks of %lu bytes, phy:%u/%u %s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%ld.%ld, %ld.%ld]\n",
+ 		printf("LU%d: LUN%d %s: storage_onlinex %s [%s, %" PRIu64 "GB.%" PRIu64 "MB, %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u/%u %s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%" PRI_TIME_T ".%" PRI_TIME_T ", %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 				lu->num, i, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
 				spec->file, gb_size, mb_size, spec->blockcnt, spec->blocklen, spec->rshift, spec->rshiftreal,
 				spec->readcache ? "" : "RCD", spec->writecache ? " WCE" : "",
@@ -762,7 +768,7 @@ istgt_lu_disk_open(ISTGT_LU_Ptr lu, int i)
 				spec->wsame ? " WSAME" : "", spec->dpofua ? " DPOFUA" : "",
 				rpm, spec->queue_depth, spec->luworkers, spec->luworkersActive,
 				_s1.tv_sec, _s1.tv_nsec, _s2.tv_sec, _s2.tv_nsec);
- 		ISTGT_LOG("LU%d: LUN%d %s: storage_onlinex %s [%s, %luGB.%luMB, %lu blks of %lu bytes, phy:%u/%u %s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%ld.%ld, %ld.%ld]\n",
+ 		ISTGT_LOG("LU%d: LUN%d %s: storage_onlinex %s [%s, %" PRIu64 "GB.%" PRIu64 "MB, %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u/%u %s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%" PRI_TIME_T ".%" PRI_TIME_T ", %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 				lu->num, i, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
  				spec->file, gb_size, mb_size, spec->blockcnt, spec->blocklen, spec->rshift, spec->rshiftreal,
 				spec->readcache ? "" : "RCD", spec->writecache ? " WCE" : "",
@@ -826,13 +832,13 @@ istgt_lu_disk_allocate_raw(ISTGT_LU_DISK *spec)
 		xfree(data);
 		return -1;
 	}
-	
+
 	/* allocate complete size */
 	/*This can be avoided since thin provisioned volume of this size has already been created*/
 	/*
 	rc = pwrite(spec->fd, data, nbytes, offset);
 	if (rc < 0 || (uint64_t) rc != nbytes) {
-		ISTGT_ERRLOG("lu_disk_write() failed:errno:%d written:%ld\n", errno, rc);
+		ISTGT_ERRLOG("lu_disk_write() failed:errno:%d written:%" PRId64 "\n", errno, rc);
 		xfree(data);
 		return -1;
 	}
@@ -931,7 +937,7 @@ istgt_lu_disk_init(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr lu)
 	printf("LU%d HDD UNIT\n", lu->num);
 	ISTGT_NOTICELOG("lu_disk_init LU%d TargetName=%s",
 	    lu->num, lu->name);
-	
+
 	for (i = 0; i < lu->maxlun; i++) {
 		if (lu->lun[i].type == ISTGT_LU_LUN_TYPE_NONE) {
 			ISTGT_TRACELOG(ISTGT_TRACE_DEBUG, "LU%d: LUN%d none\n",
@@ -1046,7 +1052,7 @@ istgt_lu_disk_init(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr lu)
 				ISTGT_ERRLOG("LU%d: luworker %d mutex_init() failed errno:%d\n", lu->num, k, errno);
 				return -1;
 			}
-        
+
 			rc = pthread_cond_init(&spec->luworker_cond[k], NULL);
 			if (rc != 0) {
 				ISTGT_ERRLOG("LU%d: luworker %d cond_init() failed errno:%d\n", lu->num, k, errno);
@@ -1059,7 +1065,7 @@ istgt_lu_disk_init(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr lu)
 				ISTGT_ERRLOG("LU%d: luworker %d mutex_init() failed errno:%d\n", lu->num, k, errno);
 				return -1;
 			}
-        
+
 			rc = pthread_cond_init(&spec->luworker_rcond[k], NULL);
 			if (rc != 0) {
 				ISTGT_ERRLOG("LU%d: luworker %d cond_init() failed errno:%d\n", lu->num, k, errno);
@@ -1072,7 +1078,7 @@ istgt_lu_disk_init(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr lu)
 				ISTGT_ERRLOG("LU%d: lu_tmf_mutex %d mutex_init() failed errno:%d\n", lu->num, k, errno);
 				return -1;
 			}
-        
+
 			rc = pthread_cond_init(&spec->lu_tmf_cond[k], NULL);
 			if (rc != 0) {
 				ISTGT_ERRLOG("LU%d: lu_tmf_cond %d cond_init() failed errno:%d\n", lu->num, k, errno);
@@ -1094,7 +1100,7 @@ istgt_lu_disk_init(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr lu)
 		spec->schdler_cmd_waiting = 0;
 		spec->error_count = 0;
 		spec->maint_thread_waiting = 0;
-	
+
 		rc = pthread_mutex_init(&spec->pr_rsv_mutex, NULL);
 		if (rc != 0) {
 			ISTGT_ERRLOG("LU%d: persistent reservation mutex_init() failed errno:%d\n", lu->num, errno);
@@ -1218,7 +1224,7 @@ error_return:
 				spec->lb_per_rec = lbPerRecord;
 				spec->rshiftreal = fls(lbPerRecord) - 1;
 				if (lbPerRecord & (lbPerRecord-1)) {
-					ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%lu zfsrecordSize:%u\n",
+					ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%" PRIu64 " zfsrecordSize:%u\n",
 							lu->num, i, spec->blocklen, spec->rsize);
 				}
 			}
@@ -1286,19 +1292,19 @@ error_return:
 					off_t rsize = 0;
 					rc = ioctl(spec->fd, DIOCGSTRIPESIZE, &rsize);
 					if (rc != -1) {
-						ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%lu\n", lu->num, i, rsize);
+						ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%" PRIu64 "\n", lu->num, i, rsize);
 						spec->rsize = rsize;
 						if (spec->rsize > spec->blocklen) {
 							lbPerRecord = spec->rsize / ((uint32_t)(spec->blocklen));
 							spec->lb_per_rec = lbPerRecord;
 							spec->rshiftreal = fls(lbPerRecord) - 1;
 							if (lbPerRecord & (lbPerRecord-1)) {
-								ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%lu zfsrecordSize:%u\n",
+								ISTGT_ERRLOG("LU%d: LUN%d: invalid blocklen:%" PRIu64 " zfsrecordSize:%u\n",
 										lu->num, i, spec->blocklen, spec->rsize);
 							}
 						}
 					} else {
-						ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%lu failed:%d %d\n", lu->num, i, rsize, rc, errno);
+						ISTGT_ERRLOG("LU%d: LUN%d: ioctl-blksize:%" PRIu64 " failed:%d %d\n", lu->num, i, rsize, rc, errno);
 					}
 				}
 				*/
@@ -1336,7 +1342,7 @@ error_return:
 
 				gb_size = spec->size / ISTGT_LU_1GB;
 				mb_size = (spec->size % ISTGT_LU_1GB) / ISTGT_LU_1MB;
-				printf("LU%d: LUN%d %s: storage_online %s [%s, %luGB.%luMB, %lu blks of %lu bytes, phy:%u/%u %s%s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%ld.%ld, %ld.%ld]\n",
+				printf("LU%d: LUN%d %s: storage_online %s [%s, %" PRIu64 "GB.%" PRIu64 "MB, %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u/%u %s%s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%" PRI_TIME_T ".%" PRI_TIME_T ", %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 					lu->num, i, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
 					spec->file, gb_size, mb_size, spec->blockcnt, spec->blocklen, spec->rshift, spec->rshiftreal,
 					spec->readcache ? "" : "RCD", spec->writecache ? " WCE" : "",
@@ -1345,7 +1351,7 @@ error_return:
 					spec->wzero ? " WZERO" : "",
 					rpm, spec->queue_depth, spec->luworkers, spec->luworkersActive,
 					_s1.tv_sec, _s1.tv_nsec, _s2.tv_sec, _s2.tv_nsec);
-				ISTGT_LOG("LU%d: LUN%d %s: storage_online %s [%s, %luGB.%luMB, %lu blks of %lu bytes, phy:%u/%u %s%s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%ld.%ld, %ld.%ld]\n",
+				ISTGT_LOG("LU%d: LUN%d %s: storage_online %s [%s, %" PRIu64 "GB.%" PRIu64 "MB, %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u/%u %s%s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d [%" PRI_TIME_T ".%" PRI_TIME_T ", %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 					lu->num, i, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
 					spec->file, gb_size, mb_size, spec->blockcnt, spec->blocklen, spec->rshift, spec->rshiftreal,
 					spec->readcache ? "" : "RCD", spec->writecache ? " WCE" : "",
@@ -1454,7 +1460,7 @@ istgt_lu_disk_shutdown(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr
 			spec->ex_state = ISTGT_LUN_CLOSE;
 			MTX_UNLOCK(&spec->state_mutex);
 			timesdiff(clockid, _wrk, _wrkx, _s3)
-			ISTGT_LOG("LU%d: LUN%d %s: storage_offlinex %s [%s %"PRIu64" blocks, %"PRIu64" bytes/block] [%ld.%ld %ld.%ld %ld.%ld]\n",
+			ISTGT_LOG("LU%d: LUN%d %s: storage_offlinex %s [%s %"PRIu64" blocks, %"PRIu64" bytes/block] [%" PRI_TIME_T ".%" PRI_TIME_T " %" PRI_TIME_T ".%" PRI_TIME_T " %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 					lu->num, i, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
 					spec->file, spec->blockcnt, spec->blocklen,
 					_s1.tv_sec, _s1.tv_nsec, _s2.tv_sec, _s2.tv_nsec, _s3.tv_sec, _s3.tv_nsec);
@@ -1476,22 +1482,22 @@ istgt_lu_disk_shutdown(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr
 
 		if (lu->queue_depth != 0) {
 			for ( i=0; i < lu->luworkers; i++ ) {
-				MTX_LOCK(&spec->luworker_mutex[i]);	
+				MTX_LOCK(&spec->luworker_mutex[i]);
 				rc = pthread_cond_broadcast(&spec->luworker_cond[i]);
 				if (rc != 0) {
 					ISTGT_ERRLOG("LU%d: %d luthread cond_broadcast() failed:%d\n", lu->num, i, rc);
-				}	
-				MTX_UNLOCK(&spec->luworker_mutex[i]);	
+				}
+				MTX_UNLOCK(&spec->luworker_mutex[i]);
 			}
 
-			MTX_LOCK(&spec->schdler_mutex);	
+			MTX_LOCK(&spec->schdler_mutex);
 			rc = pthread_cond_broadcast(&spec->schdler_cond);
 			if (rc != 0) {
 				ISTGT_ERRLOG("LU%d: schdler_cond_broadcast() failed:%d\n", lu->num, rc);
 			}
-			MTX_UNLOCK(&spec->schdler_mutex);	
+			MTX_UNLOCK(&spec->schdler_mutex);
 
-			MTX_LOCK(&spec->complete_queue_mutex);	
+			MTX_LOCK(&spec->complete_queue_mutex);
 			rc = pthread_cond_broadcast(&spec->cmd_queue_cond);
 			if (rc != 0) {
 				ISTGT_ERRLOG("LU%d: cmd_q cond_broadcast() failed:%d\n", lu->num, rc);
@@ -1514,10 +1520,10 @@ istgt_lu_disk_shutdown(ISTGT_Ptr istgt __attribute__((__unused__)), ISTGT_LU_Ptr
 				}
 			}
 			rc = pthread_join(lu->schdler_thread, NULL);
-			if (rc != 0) 
+			if (rc != 0)
 				ISTGT_ERRLOG("LU%d: pthread_join() failed for schdler thread join\n", lu->num);
 			rc = pthread_join(lu->maintenance_thread, NULL);
-			if (rc != 0) 
+			if (rc != 0)
 				ISTGT_ERRLOG("LU%d: pthread_join() failed for maint thread join\n", lu->num);
 		}
 		istgt_queue_destroy(&spec->cmd_queue);
@@ -3429,7 +3435,7 @@ istgt_lu_disk_add_nexus(ISTGT_LU_Ptr lu, int lun, const char *initiator_port)
 		goto error_return;
 	}
 	TAILQ_INSERT_TAIL(&spec->nexus, nexus, nexus_next);
-	
+
 	return 0;
 	error_return:
 		return -2;
@@ -3557,7 +3563,7 @@ istgt_lu_disk_remove_other_pr_key(ISTGT_LU_DISK *spec, CONN_Ptr conn __attribute
 			continue;
 		}
 		if (key == 0 || prkey->key == key){
-			i++;	
+			i++;
 			continue;
 		}
 		if (initiator_port == NULL ||
@@ -3881,15 +3887,15 @@ istgt_lu_disk_update_reservation(ISTGT_LU_DISK *spec)
 	/* Lun is in the fake mode, Spurious Reservation commands are not allowed */
 	if (spec->fd == -1 || spec->state == ISTGT_LUN_BUSY) {
 		ret = -1;
-		ISTGT_ERRLOG("LU%d:RSV-UPD %s (rsvkey?:%lx)",
+		ISTGT_ERRLOG("LU%d:RSV-UPD %s (rsvkey?:%" PRIx64 ")",
 				luni, spec->state == ISTGT_LUN_BUSY ? "FAKE" : "fd invalid", spec->rsv_key);
 		goto exit;
 	}
-	
+
 	pr_reservation = xmalloc(sizeof  *pr_reservation);
 	memset(pr_reservation, 0, sizeof *pr_reservation);
 
-	if (spec->npr_keys > MAX_LU_ZAP_RESERVE) { 
+	if (spec->npr_keys > MAX_LU_ZAP_RESERVE) {
 		pr_reservation->npr_keys = MAX_LU_ZAP_RESERVE;
 	} else {
 		pr_reservation->npr_keys = spec->npr_keys;
@@ -3906,8 +3912,8 @@ istgt_lu_disk_update_reservation(ISTGT_LU_DISK *spec)
 			rsv_idx = i;
 		}
 	}
-	
-	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI, "LU%d:RSV-UPD  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+
+	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI, "LU%d:RSV-UPD  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 			luni, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 			spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 
@@ -3921,7 +3927,7 @@ istgt_lu_disk_update_reservation(ISTGT_LU_DISK *spec)
 		} else {
 			prkey = &spec->pr_keys[i];
 		}
-		if (prkey != NULL ) { 
+		if (prkey != NULL ) {
 			/* copy the string */
 			pr_reservation->keys[i].key = prkey->key;
 			strncpy(pr_reservation->keys[i].registered_initiator_port, prkey->registered_initiator_port,
@@ -3931,7 +3937,7 @@ istgt_lu_disk_update_reservation(ISTGT_LU_DISK *spec)
 			pr_reservation->keys[i].pg_idx= prkey->pg_idx;
 			pr_reservation->keys[i].pg_tag = prkey->pg_tag;
 			pr_reservation->keys[i].all_tpg = prkey->all_tpg;
-			ISTGT_TRACELOG(ISTGT_TRACE_ISCSI, "LU%d:RSV-UPD.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
+			ISTGT_TRACELOG(ISTGT_TRACE_ISCSI, "LU%d:RSV-UPD.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
 					luni, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 					prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag,
 					prkey->ninitiator_ports);
@@ -3939,11 +3945,11 @@ istgt_lu_disk_update_reservation(ISTGT_LU_DISK *spec)
 	}
 
 #ifdef	REPLICATION
-	// TODO Write the Persistent Reservation data to the device as a ZAP attribute 
+	// TODO Write the Persistent Reservation data to the device as a ZAP attribute
 	#ifdef __FreeBSD__
 	if (ioctl(spec->fd, DIOCGWRRSV, pr_reservation) == -1) {
 		if (errno != ENOENT){
-			ISTGT_ERRLOG("LU%d:RSV-UPD  failed:%d  (rsvkey:%lx)",
+			ISTGT_ERRLOG("LU%d:RSV-UPD  failed:%d  (rsvkey:%" PRIx64 ")",
 				luni, errno, spec->rsv_key);
 			ret = -1;
 		}
@@ -3974,7 +3980,7 @@ istgt_lu_disk_get_reservation(ISTGT_LU_DISK *spec)
 
 	/* The Lun is in fake mode, Fail here only */
 	if (spec->fd == -1) {
-		ISTGT_NOTICELOG("LU%d:RSV-READ  %s (rsvkey?:%lx)",
+		ISTGT_NOTICELOG("LU%d:RSV-READ  %s (rsvkey?:%" PRIx64 ")",
 				luni, spec->state == ISTGT_LUN_BUSY ? "FAKE" : "fd invalid", spec->rsv_key);
 		ret = -1;
 		spec->rsv_pending |= ISTGT_RSV_READ;
@@ -3988,7 +3994,7 @@ istgt_lu_disk_get_reservation(ISTGT_LU_DISK *spec)
 	#ifdef __FreeBSD__
 	if (ioctl(spec->fd, DIOCGRDRSV, pr_reservation) == -1) {
 		if (errno != ENOENT) {
-			ISTGT_ERRLOG("LU%d:RSV-READ  failed:%d  (rsvkey?:%lx)",
+			ISTGT_ERRLOG("LU%d:RSV-READ  failed:%d  (rsvkey?:%" PRIx64 ")",
 				luni, errno, spec->rsv_key);
 			ret = -1;
 			spec->rsv_pending |= ISTGT_RSV_READ;
@@ -4020,12 +4026,12 @@ istgt_lu_disk_get_reservation(ISTGT_LU_DISK *spec)
 	spec->rsv_type = pr_reservation->rsv_type;
 	spec->pr_generation = pr_reservation->pr_generation;
 	spec->rsv_key = pr_reservation->rsv_key;
-			
+
 	if (spec->rsv_port != NULL)
 		xfree(spec->rsv_port);
 	spec->rsv_port = xstrdup(trim_string(pr_reservation->rsv_port));
-	
-	ISTGT_NOTICELOG("LU%d:RSV-READ  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+
+	ISTGT_NOTICELOG("LU%d:RSV-READ  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 			luni, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 			spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 
@@ -4042,7 +4048,7 @@ istgt_lu_disk_get_reservation(ISTGT_LU_DISK *spec)
 			spec->pr_keys[i].pg_idx = prkey->pg_idx;
 			spec->pr_keys[i].pg_tag = prkey->pg_tag;
 			spec->pr_keys[i].all_tpg = prkey->all_tpg;
-			ISTGT_NOTICELOG("LU%d:RSV-READ.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d ",
+			ISTGT_NOTICELOG("LU%d:RSV-READ.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d ",
 					luni, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 					prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag);
 		}
@@ -4060,7 +4066,7 @@ istgt_lu_disk_copy_reservation(ISTGT_LU_DISK *spec_bkp, ISTGT_LU_DISK *spec)
 	int i = 0, j = 0;
 	ISTGT_LU_PR_KEY *prkey_bkp;
 	ISTGT_LU_PR_KEY *prkey;
-	
+
 	if (spec_bkp->rsv_port != NULL)
 		xfree(spec_bkp->rsv_port);
 
@@ -4098,9 +4104,9 @@ istgt_lu_disk_copy_reservation(ISTGT_LU_DISK *spec_bkp, ISTGT_LU_DISK *spec)
 				prkey_bkp->initiator_ports[j]= xstrdup(prkey->initiator_ports[j]);
 			}
 		}
-		
+
 	}
-	return 0;	
+	return 0;
 }
 
 
@@ -4131,7 +4137,7 @@ istgt_lu_disk_print_reservation(ISTGT_LU_Ptr lu, int lun)
 	uint64_t gb_size = spec->size / ISTGT_LU_1GB;
 	uint64_t mb_size = (spec->size % ISTGT_LU_1GB) / ISTGT_LU_1MB;
 
-	ISTGT_NOTICELOG("LU%d:RSV %s %s [%s, %luGB.%luMB, %lu blks of %lu bytes, phy:%u %s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d inflight:%d\n",
+	ISTGT_NOTICELOG("LU%d:RSV %s %s [%s, %" PRIu64 "GB.%" PRIu64 "MB, %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u %s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d inflight:%d\n",
 				lu->num, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
 				spec->file, gb_size, mb_size, spec->blockcnt, spec->blocklen, spec->rshift,
 				spec->readcache ? "" : "RCD", spec->writecache ? " WCE" : "",
@@ -4139,12 +4145,12 @@ istgt_lu_disk_print_reservation(ISTGT_LU_Ptr lu, int lun)
 				spec->wsame ? " WSAME" : "", spec->dpofua ? " DPOFUA" : "",
 				lu->lun[lun].rotationrate,
 				spec->queue_depth, spec->luworkers, spec->luworkersActive, spec->ludsk_ref);
-	ISTGT_NOTICELOG("LU%d:RSV  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+	ISTGT_NOTICELOG("LU%d:RSV  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 			lu->num, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 			spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 	for (i = 0; i < spec->npr_keys; i++) {
 		prkey = &spec->pr_keys[i];
-		ISTGT_NOTICELOG("LU%d:RSV.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
+		ISTGT_NOTICELOG("LU%d:RSV.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
 			lu->num, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 			prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag,
 			prkey->ninitiator_ports);
@@ -4202,7 +4208,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 
 	spec_bkp = xmalloc(sizeof(*spec_bkp));
 	memset(spec_bkp, 0, sizeof(*spec_bkp));
-	
+
 	rkey = DGET64(&data[0]);
 	sarkey = DGET64(&data[8]);
 	spec_i_pt = BGET8(&data[20], 3);
@@ -4210,7 +4216,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 	aptpl = BGET8(&data[20], 0);
 
 	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		"c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+		"c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 		conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 		rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 
@@ -4223,7 +4229,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (aptpl != 0) {
 			/* Activate Persist Through Power Loss */
 			ISTGT_ERRLOG("c#%d unsupport Activate Persist Through Power Loss\n", conn->id);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INVALID FIELD IN PARAMETER LIST */
@@ -4238,7 +4244,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    conn->target_port, 0);
 		if (prkey == NULL) {
 			ISTGT_ERRLOG("c#%d unregistered port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* unregistered port */
@@ -4255,7 +4261,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			if (spec_i_pt) {
 				/* INVALID FIELD IN CDB */
 				ISTGT_ERRLOG("c#%d Invalid field in CDB\n", conn->id);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4268,7 +4274,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			    conn->initiator_port, conn->target_port, rkey);
 			if (prkey == NULL) {
 				ISTGT_ERRLOG("c#%d key not found initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				/* not found key */
@@ -4286,7 +4292,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 					change_rsv = 1;
 			}*/
 			if ((sarkey != 0) && (spec_i_pt == 0)) {
-				ISTGT_ERRLOG("c#%d change_rsv REGISTER rsvkey:%lx rkey %lx sakey:0x%16.16lx\n", conn->id, spec->rsv_key, rkey, sarkey);
+				ISTGT_ERRLOG("c#%d change_rsv REGISTER rsvkey:%" PRIx64 " rkey %" PRIx64 " sakey:0x%16.16" PRIx64 "\n", conn->id, spec->rsv_key, rkey, sarkey);
 				change_rsv = 1;
 			}
 
@@ -4295,7 +4301,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			    conn->initiator_port, conn->target_port, 0);
 			if (rc < 0) {
 				ISTGT_ERRLOG("c#%d lu_disk_remove_pr_key() failed\n", conn->id);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				/* INTERNAL TARGET FAILURE */
@@ -4321,7 +4327,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    conn->target_port, 0);
 		if (prkey == NULL) {
 			ISTGT_ERRLOG("c#%d unregistered port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* unregistered port */
@@ -4335,7 +4341,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (prkey == NULL) {
 			/* not found key */
 			ISTGT_ERRLOG("c#%d key not found initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			lu_cmd->status = ISTGT_SCSI_STATUS_RESERVATION_CONFLICT;
@@ -4347,7 +4353,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		} else {
 			if (prkey->key != spec->rsv_key) {
 				ISTGT_ERRLOG("c#%d prkey->key != spec->rsv_key initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				lu_cmd->status = ISTGT_SCSI_STATUS_RESERVATION_CONFLICT;
@@ -4356,7 +4362,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			}
 			if (strcasecmp(spec->rsv_port, conn->initiator_port) != 0) {
 				ISTGT_ERRLOG("c#%d spec->rsv_port != conn->initiator_port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				lu_cmd->status = ISTGT_SCSI_STATUS_RESERVATION_CONFLICT;
@@ -4374,7 +4380,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (scope != 0x00) { // !LU_SCOPE
 			/* INVALID FIELD IN CDB */
 			ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4389,7 +4395,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    && type != ISTGT_LU_PR_TYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS
 		    && type != ISTGT_LU_PR_TYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS) {
 			ISTGT_ERRLOG("c#%d unsupported type 0x%x\n", conn->id, type);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INVALID FIELD IN CDB */
@@ -4409,7 +4415,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		spec->rsv_type = type;
 
 		ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		    "c#%d LU%d: reserved (scope=%d, type=%d) by key=0x%16.16lx\n",
+		    "c#%d LU%d: reserved (scope=%d, type=%d) by key=0x%16.16" PRIx64 "\n",
 		    conn->id, spec->lu->num, scope, type, rkey);
 		break;
 
@@ -4426,7 +4432,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (prkey == NULL) {
 			/* unregistered port */
 			ISTGT_ERRLOG("c#%d unregistered port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			lu_cmd->status = ISTGT_SCSI_STATUS_RESERVATION_CONFLICT;
@@ -4439,7 +4445,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (prkey == NULL) {
 			/* not found key */
 			ISTGT_ERRLOG("c#%d unregistered port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			lu_cmd->status = ISTGT_SCSI_STATUS_RESERVATION_CONFLICT;
@@ -4449,7 +4455,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (prkey->key != spec->rsv_key) {
 			/* INVALID RELEASE OF PERSISTENT RESERVATION */
 			ISTGT_ERRLOG("c#%d prkey->key != spec->rsv_key initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x04);
@@ -4460,7 +4466,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (strcasecmp(spec->rsv_port, conn->initiator_port) != 0) {
 			/* INVALID RELEASE OF PERSISTENT RESERVATION */
 			ISTGT_ERRLOG("c#%d spec->rsv_port != conn->initiator_port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x04);
@@ -4472,7 +4478,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (scope != 0x00) { // !LU_SCOPE
 			/* INVALID FIELD IN CDB */
 			ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4487,7 +4493,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    && type != ISTGT_LU_PR_TYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS
 		    && type != ISTGT_LU_PR_TYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS) {
 			ISTGT_ERRLOG("c#%d unsupported type 0x%x\n", conn->id, type);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INVALID FIELD IN CDB */
@@ -4499,7 +4505,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (spec->rsv_scope != scope || spec->rsv_type != type) {
 			/* INVALID RELEASE OF PERSISTENT RESERVATION */
 			ISTGT_ERRLOG("c#%d spec->rsv_scope != scope || spec->rsv_type != type initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x04);
@@ -4516,7 +4522,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		spec->rsv_type = 0;
 
 		ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		    "c#%d LU%d: released 0x%16.16lx (scope=%d, type=%d) by key=0x%16.16lx\n",
+		    "c#%d LU%d: released 0x%16.16" PRIx64 " (scope=%d, type=%d) by key=0x%16.16" PRIx64 "\n",
 		    conn->id, spec->lu->num, spec->rsv_key, scope, type, rkey);
 		spec->rsv_key = 0;
 		break;
@@ -4528,7 +4534,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (prkey == NULL) {
 			/* unregistered port */
 			ISTGT_ERRLOG("c#%d unregistered port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			lu_cmd->status = ISTGT_SCSI_STATUS_RESERVATION_CONFLICT;
@@ -4559,7 +4565,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    conn->target_port, 0);
 		if (prkey == NULL) {
 			ISTGT_ERRLOG("c#%d unregistered port initiator_port: %s target_port: %s rsv_port: %s\n", conn->id, conn->initiator_port, conn->target_port, spec->rsv_port);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* unregistered port */
@@ -4576,7 +4582,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			    NULL, NULL, sarkey);
 			if (rc < 0) {
 				ISTGT_ERRLOG("c#%d lu_disk_remove_pr_key() failed\n", conn->id);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				/* INTERNAL TARGET FAILURE */
@@ -4603,7 +4609,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				    NULL, NULL, sarkey);
 				if (rc < 0) {
 					ISTGT_ERRLOG("c#%d lu_disk_remove_pr_key() failed\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					/* INTERNAL TARGET FAILURE */
@@ -4626,7 +4632,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				    rkey);
 				if (rc < 0) {
 					ISTGT_ERRLOG("c#%d lu_disk_remove_other_pr_key() failed\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					/* INTERNAL TARGET FAILURE */
@@ -4639,7 +4645,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				if (scope != 0x00) { // !LU_SCOPE
 					/* INVALID FIELD IN CDB */
 					ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4654,7 +4660,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				    && type != ISTGT_LU_PR_TYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS
 				    && type != ISTGT_LU_PR_TYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS) {
 					ISTGT_ERRLOG("c#%d unsupported type 0x%x\n", conn->id, type);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					/* INVALID FIELD IN CDB */
@@ -4678,7 +4684,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				spec->rsv_scope = scope;
 				spec->rsv_type = type;
 
-				ISTGT_NOTICELOG("c#%d LU%d: reserved (scope=%d, type=%d) by key=0x%16.16"PRIx64" rsv:%s (preempt:%s)\n",
+				ISTGT_NOTICELOG("c#%d LU%d: reserved (scope=%d, type=%d) by key=0x%16.16" PRIx64 " rsv:%s (preempt:%s)\n",
 				    conn->id, spec->lu->num, scope, type, rkey, spec->rsv_port,
 					task_abort && (old_rsv_port != NULL) ? old_rsv_port: "none");
 
@@ -4695,7 +4701,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 						if (rc < 0) {
 							/* INTERNAL TARGET FAILURE */
 							ISTGT_ERRLOG("c#%d INTERNAL TARGET FAILURE\n", conn->id);
-							ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+							ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 								conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 								rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 							BUILD_SENSE(HARDWARE_ERROR, 0x44, 0x00);
@@ -4735,7 +4741,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				    NULL, NULL, sarkey);
 				if (rc < 0) {
 					ISTGT_ERRLOG("c#%d lu_disk_remove_pr_key() failed\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					/* INTERNAL TARGET FAILURE */
@@ -4749,7 +4755,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			} else {
 				/* INVALID FIELD IN PARAMETER LIST */
 				ISTGT_ERRLOG("c#%d INVALID FIELD IN PARAMETER LIST\n", conn->id);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x00);
@@ -4764,7 +4770,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    NULL, NULL, sarkey);
 		if (rc < 0) {
 			ISTGT_ERRLOG("c#%d lu_disk_remove_pr_key() failed\n", conn->id);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INTERNAL TARGET FAILURE */
@@ -4776,7 +4782,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 
 		if (scope != 0x00) { // !LU_SCOPE
 			/* INVALID FIELD IN CDB */
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4791,7 +4797,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    && type != ISTGT_LU_PR_TYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS
 		    && type != ISTGT_LU_PR_TYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS) {
 			ISTGT_ERRLOG("c#%d unsupported type 0x%x\n", conn->id, type);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INVALID FIELD IN CDB */
@@ -4832,7 +4838,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				if (rc < 0) {
 					/* INTERNAL TARGET FAILURE */
 					ISTGT_ERRLOG("c#%d INTERNAL TARGET FAILURE\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					BUILD_SENSE(HARDWARE_ERROR, 0x44, 0x00);
@@ -4860,7 +4866,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		if (aptpl != 0) {
 			/* Activate Persist Through Power Loss */
 			ISTGT_ERRLOG("c#%d unsupport Activate Persist Through Power Loss\n", conn->id);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INVALID FIELD IN PARAMETER LIST */
@@ -4879,7 +4885,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 				if (spec_i_pt) {
 					/* INVALID FIELD IN CDB */
 					ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4899,7 +4905,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 			if (spec_i_pt) {
 				/* INVALID FIELD IN CDB */
 				ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -4915,7 +4921,7 @@ istgt_lu_disk_scsi_persistent_reserve_out(ISTGT_LU_DISK *spec,
 		    conn->target_port, 0);
 		if (rc < 0) {
 			ISTGT_ERRLOG("c#%d lu_disk_remove_pr_key() failed\n", conn->id);
-			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+			ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 				conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 				rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 			/* INTERNAL TARGET FAILURE */
@@ -4940,7 +4946,7 @@ do_register:
 			if (len < 28) {
 				/* INVALID FIELD IN PARAMETER LIST */
 				ISTGT_ERRLOG("c#%d INVALID FIELD IN PARAMETER LIST\n", conn->id);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x00);
@@ -4954,7 +4960,7 @@ do_register:
 			if (28 + plen > len) {
 				ISTGT_ERRLOG("c#%d invalid length %d (expect %d)\n",
 				    conn->id, len, 28 + plen);
-				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+				ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 					conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 					rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 				/* INVALID FIELD IN PARAMETER LIST */
@@ -4988,7 +4994,7 @@ do_register:
 					if (rc < 0) {
 						/* INVALID FIELD IN PARAMETER LIST */
 						ISTGT_ERRLOG("c#%d INVALID FIELD IN PARAMETER LIST\n", conn->id);
-						ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+						ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 							conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 							rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 						BUILD_SENSE(ILLEGAL_REQUEST, 0x26, 0x00);
@@ -5010,7 +5016,7 @@ do_register:
 					/* registered port */
 					/* INVALID FIELD IN CDB */
 					ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+					ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 						conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 						rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 					BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -5101,7 +5107,7 @@ do_register:
 	case 0x07: /* REGISTER AND MOVE */
 		/* INVALID FIELD IN CDB */
 		ISTGT_ERRLOG("c#%d INVALID FIELD IN CDB\n", conn->id);
-		ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16lx sakey=0x%16.16lx ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16lx]\n",
+		ISTGT_LOG("c#%d %s:0x%2.2x key=0x%16.16" PRIx64 " sakey=0x%16.16" PRIx64 " ipt=%d tgpt=%d aptpl=%d iport:%s [0x%16.16" PRIx64 "]\n",
 			conn->id, prout_sa[(sa > -1 && sa < PROUTSA_UNK) ? sa : PROUTSA_UNK], sa,
 			rkey, sarkey, spec_i_pt, all_tg_pt, aptpl, conn->initiator_port, spec->rsv_key);
 		BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);
@@ -5297,13 +5303,13 @@ istgt_lu_disk_scsi_release(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 	    0x02, 0x00, 0x03,
 	    PRO_data, parameter_len, 1);
 	if (rc < 0) {
-		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 					conn->id, luni, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 					spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 		for (i = 0; i < spec->npr_keys; i++) {
 			prkey = &spec->pr_keys[i];
 			if (prkey != NULL ) {
-				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
+				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
 					conn->id, luni, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 					prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag,
 					prkey->ninitiator_ports);
@@ -5340,13 +5346,13 @@ istgt_lu_disk_scsi_release(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 	    0x06, 0, 0,
 	    PRO_data, parameter_len, 1);
 	if (rc < 0) {
-		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 					conn->id, luni, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 					spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 		for (i = 0; i < spec->npr_keys; i++) {
 			prkey = &spec->pr_keys[i];
 			if (prkey != NULL ) {
-				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
+				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
 					conn->id, luni, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 					prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag,
 					prkey->ninitiator_ports);
@@ -5422,11 +5428,11 @@ istgt_lu_disk_unmap(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd,
 	while (len + 16 <= pllen) {
 		unmbd[0] = DGET64(&data[len]);
 		unmbd[1] = DGET32(&data[len + 8]);
-		ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d unmap lba:%lu +%lu blocks (%d/%d)\n", conn->id, unmbd[0], unmbd[1], len, pllen);
+		ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d unmap lba:%" PRIu64 " +%" PRIu64 " blocks (%d/%d)\n", conn->id, unmbd[0], unmbd[1], len, pllen);
 		if (unmbd[1] != 0) {
 			lba = unmbd[0];
 			lblen = unmbd[1];
-			lu_cmd->lba = lba; 
+			lu_cmd->lba = lba;
 			lu_cmd->lblen = lblen;
 			if (lba >= maxlba || lblen > maxlba || lba > (maxlba - lblen)) {
 				ISTGT_ERRLOG("c#%d end of media in unmap\n", conn->id);
@@ -5472,10 +5478,10 @@ istgt_lu_disk_unmap(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd,
 	timediffw(lu_cmd, 'D');
 
 	if (markedForFree == 1 || markedForReturn == 1) {
-		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (unmap lba:%lu+%lu)",
+		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (unmap lba:%" PRIu64 "+%" PRIu64 ")",
 				conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, lba, lblen);
 	} else if (ret == -1) {
-		ISTGT_ERRLOG("c#%d unmap lba:%lu +%lu blocks faild:%d (%d/%d)\n", conn->id, lba, lblen, lerr, len, pllen);
+		ISTGT_ERRLOG("c#%d unmap lba:%" PRIu64 " +%" PRIu64 " blocks faild:%d (%d/%d)\n", conn->id, lba, lblen, lerr, len, pllen);
 	}
 	return ret;
 }
@@ -5523,13 +5529,13 @@ istgt_lu_disk_scsi_reserve(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 	    0x06, 0, 0,
 	    PRO_data, parameter_len, 1);
 	if (rc < 0) {
-		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 					conn->id, luni, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 					spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 		for (i = 0; i < spec->npr_keys; i++) {
 			prkey = &spec->pr_keys[i];
 			if (prkey != NULL ) {
-				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
+				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
 					conn->id, luni, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 					prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag,
 					prkey->ninitiator_ports);
@@ -5567,13 +5573,13 @@ istgt_lu_disk_scsi_reserve(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 	    0x01, 0x00, 0x03,
 	    PRO_data, parameter_len, 1);
 	if (rc < 0) {
-		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16lx gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
+		ISTGT_LOG("c#%d LU%d:RSV-UPD  0x%16.16" PRIx64 " gen:%d spc2:%d scope:%d type:%d  port=[%s] npr:%d",
 					conn->id, luni, spec->rsv_key, spec->pr_generation, spec->spc2_reserved,
 					spec->rsv_scope, spec->rsv_type, spec->rsv_port, spec->npr_keys);
 		for (i = 0; i < spec->npr_keys; i++) {
 			prkey = &spec->pr_keys[i];
 			if (prkey != NULL ) {
-				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%lx at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
+				ISTGT_LOG("c#%d LU%d:RSV-UPD.%2.2d  key:%" PRIx64 " at:%d [I:%s T:%s] idx:%d tag:%d NIN:%d ",
 					conn->id, luni, i, prkey->key, prkey->all_tpg, prkey->registered_initiator_port,
 					prkey->registered_target_port, prkey->pg_idx, prkey->pg_tag,
 					prkey->ninitiator_ports);
@@ -5628,7 +5634,7 @@ istgt_lu_disk_lbread(ISTGT_LU_DISK *spec, CONN_Ptr conn __attribute__((__unused_
 
 
 	if (lba >= maxlba || llen > maxlba || lba > (maxlba - llen)) {
-		ISTGT_ERRLOG("c#%d end of media max:%lu (lba:%lu+%u)\n", conn->id, maxlba, lba, len);
+		ISTGT_ERRLOG("c#%d end of media max:%" PRIu64 " (lba:%" PRIu64 "+%u)\n", conn->id, maxlba, lba, len);
 		return -1;
 	}
 	if(spec->error_inject  & READ_INFLIGHT_ISCSI)
@@ -5672,7 +5678,7 @@ istgt_lu_disk_lbread(ISTGT_LU_DISK *spec, CONN_Ptr conn __attribute__((__unused_
 
 	exitblockingcall(endofmacro2)
 	if (markedForFree == 1 || markedForReturn == 1) {
-		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (read:%zd/%zd lba:%lu+%u)",
+		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (read:%" PRIu64 "/%" PRId64 " lba:%" PRIu64 "+%u)",
 				conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, nbytes, rc, lba, len);
 		if (diskIoPendingL == 0 && markedForFree == 1)
 			lu_cmd->connGone = 1;
@@ -5686,10 +5692,10 @@ istgt_lu_disk_lbread(ISTGT_LU_DISK *spec, CONN_Ptr conn __attribute__((__unused_
 #ifndef REPLICATION
 		xfree(data);
 #endif
-		errlog(lu_cmd, "c#%d lu_disk_read() failed errnor:%d read:%ld (%lu+%lu, lba:%lu+%u)", conn->id, errno, rc, offset, nbytes, lba, len)
+		errlog(lu_cmd, "c#%d lu_disk_read() failed errnor:%d read:%" PRId64 " (%" PRIu64 "+%" PRIu64 ", lba:%" PRIu64 "+%u)", conn->id, errno, rc, offset, nbytes, lba, len)
 		return -1;
 	}
-	ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d Read %"PRId64"/%"PRIu64" bytes (lba:%lu+%u)\n",
+	ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d Read %" PRId64 "/%" PRIu64 " bytes (lba:%" PRIu64 "+%u)\n",
 	    conn->id, rc, nbytes, lba, len);
 
 #ifndef REPLICATION
@@ -5733,13 +5739,13 @@ istgt_lu_disk_lbwrite(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cm
 
 
 	if (lba >= maxlba || llen > maxlba || lba > (maxlba - llen)) {
-		ISTGT_ERRLOG("c#%d end of media, max:%lu write lba:%lu+%u\n", conn->id, maxlba, lba, len);
+		ISTGT_ERRLOG("c#%d end of media, max:%" PRIu64 " write lba:%" PRIu64 "+%u\n", conn->id, maxlba, lba, len);
 		return -1;
 	}
 
 	rc = istgt_lu_disk_transfer_data(conn, lu_cmd, nbytes);
 	if (rc < 0) {
-		ISTGT_ERRLOG("c#%d lu_disk_transfer_data() failed (write lba:%lu+%u)\n", conn->id, lba, len);
+		ISTGT_ERRLOG("c#%d lu_disk_transfer_data() failed (write lba:%" PRIu64 "+%u)\n", conn->id, lba, len);
 		return -1;
 	}
 
@@ -5758,8 +5764,8 @@ istgt_lu_disk_lbwrite(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cm
 #endif
 
 	if (nbytes != lu_cmd->iobufsize) { //aj-the below call doesn't read anything
-		ISTGT_ERRLOG("c#%d nbytes(%zu) != iobufsize(%zu) (write lba:%lu+%u)\n",
-		    conn->id, (size_t) nbytes, lu_cmd->iobufsize, lba, len);
+		ISTGT_ERRLOG("c#%d nbytes(%zu) != iobufsize(%zu) (write lba:%" PRIu64 "+%u)\n",
+		    conn->id, (size_t) nbytes, (size_t) lu_cmd->iobufsize, lba, len);
 freeiovcnt:
 		for (i=0; i<iovcnt; ++i) {
 			if(iov[i].iov_base == NULL)
@@ -5859,11 +5865,11 @@ freeiovcnt:
 		lu_cmd->iobuf[i].iov_base = NULL;
 		lu_cmd->iobuf[i].iov_len = 0;
 	}
-	
+
 	exitblockingcall(endofmacro2)
 	timediffw(lu_cmd, 'D');
 	if (markedForFree == 1 || markedForReturn == 1) {
-		ISTGT_ERRLOG("c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (wrote:%zd/%zd lba:%lu+%u)",
+		ISTGT_ERRLOG("c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (wrote:%" PRId64 "/%" PRId64 " lba:%" PRIu64 "+%u)",
 				conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, nbytes, rc, lba, len);
 		if (diskIoPendingL == 0 && markedForFree == 1)
 			lu_cmd->connGone = 1;
@@ -5874,14 +5880,14 @@ freeiovcnt:
 		return -1;
 	}
 	if (rc < 0)  {
-		errlog(lu_cmd, "c#%d lu_disk_write() failed wrote:%lu of %lu+%lu (%lu) lba:%lu+%u", conn->id, rc, offset, nbytes, l_offset, lba, len)
+		errlog(lu_cmd, "c#%d lu_disk_write() failed wrote:%" PRIu64 " of %" PRIu64 "+%" PRIu64 " (%" PRIu64 ") lba:%" PRIu64 "+%u", conn->id, rc, offset, nbytes, l_offset, lba, len)
 #ifndef REPLICATION
 		for (i=0; i<iovcnt; ++i)
 			xfree(iov[i].iov_base);
 #endif
 		return -1;
 	}
-	ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d Wrote %lu/%lu bytes (lba:%lu+%u) %s\n",
+	ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d Wrote %" PRIu64 "/%" PRIu64 " bytes (lba:%" PRIu64 "+%u) %s\n",
 	    conn->id, rc, nbytes, lba, len, msg);
 
 	lu_cmd->data_len = rc;
@@ -5943,7 +5949,7 @@ istgt_lu_disk_lbwrite_same(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 		return -1;
 	}
 	getdata2(data, lu_cmd)
-	
+
 	if (spec->wzero) {
 		nbits = nbytes << 3;
 		nthbitset = find_first_bit(lu_cmd);
@@ -5971,7 +5977,7 @@ istgt_lu_disk_lbwrite_same(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 		}
 #ifndef	REPLICATION
 		//TODO
-		#ifdef __FreeBSD__	
+		#ifdef __FreeBSD__
 		off_t unmbd[2];
 		unmbd[0] = offset;
 		unmbd[1] = llen * blen;
@@ -5981,7 +5987,7 @@ istgt_lu_disk_lbwrite_same(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 		eno = errno;
 		exitblockingcall(endofmacro2);
 		if (markedForFree == 1 || markedForReturn == 1) {
-			ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (wsameX lba:%lu+%u ret:%ld).",
+			ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (wsameX lba:%" PRIu64 "+%u ret:%" PRId64 ").",
 					conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, lba, len, rc);
 			if(freedata == 1)
 				xfree(data);
@@ -5992,10 +5998,10 @@ istgt_lu_disk_lbwrite_same(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 		if (rc == -1) {
 			if(freedata == 1)
 				xfree(data);
-			ISTGT_ERRLOG("c#%d wsameX lba:%lu+%u failed %ld/%d\n", conn->id, lba, len, rc, eno);
+			ISTGT_ERRLOG("c#%d wsameX lba:%" PRIu64 "+%u failed %" PRId64 "/%d\n", conn->id, lba, len, rc, eno);
 			return -1;
 		}
-		ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d wzero_same done lba:%lu+%u\n", conn->id, lba, len);
+		ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d wzero_same done lba:%" PRIu64 "+%u\n", conn->id, lba, len);
 
 		if(freedata == 1)
 			xfree(data);
@@ -6049,7 +6055,7 @@ istgt_lu_disk_lbwrite_same(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 		exitblockingcall(endofmacro4);
 		if (markedForFree == 1 || markedForReturn == 1) {
 			timediffw(lu_cmd, 'D');
-			ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (wrote:%zd of %zd. ret:%ld).",
+			ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (wrote:%" PRId64 " of %" PRId64 ". ret:%" PRId64 ").",
 					conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, nblocks, llen, rc);
 			if (diskIoPendingL == 0 && markedForFree == 1)
 				lu_cmd->connGone = 1;
@@ -6059,7 +6065,7 @@ istgt_lu_disk_lbwrite_same(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr 
 		}
 		if (rc < 0 || (uint64_t) rc != reqbytes) {
 			timediffw(lu_cmd, 'D');
-			errlog(lu_cmd, "c#%d lu_disk_write() failed wrote:%ld, %lu of %lu blksize, blksz:%zd", conn->id, rc, nblocks, llen, nbytes)
+			errlog(lu_cmd, "c#%d lu_disk_write() failed wrote:%" PRId64 ", %" PRIu64 " of %" PRIu64 " blksize, blksz:%" PRIu64, conn->id, rc, nblocks, llen, nbytes)
 			if (freedata == 1) xfree(data);
 			xfree(workbuf);
 			return -1;
@@ -6151,7 +6157,7 @@ istgt_lu_disk_lbwrite_ats(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr l
 	exitblockingcall(endofmacro2)
 	if (markedForFree == 1 || markedForReturn == 1) {
 		timediffw(lu_cmd, 'D');
-		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (ats read:%zd/%zd @%zd)",
+		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (ats read:%" PRId64 "/%" PRId64 " @%" PRId64 ")",
 				conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, nbytes, rc, offset);
 		if (diskIoPendingL == 0 && markedForFree == 1)
 			lu_cmd->connGone = 1;
@@ -6161,7 +6167,7 @@ istgt_lu_disk_lbwrite_ats(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr l
 	}
 	if (rc < 0 || (uint64_t) rc != nbytes) {
 		timediffw(lu_cmd, 'D');
-		errlog(lu_cmd, "c#%d lu_disk_read()ats failed %ld/%lu\n", conn->id, rc, nbytes)
+		errlog(lu_cmd, "c#%d lu_disk_read()ats failed %" PRId64 "/%" PRIu64 "\n", conn->id, rc, nbytes)
 		xfree(watsbuf);
 		if (freedata == 1) xfree(data);
 		return -1;
@@ -6209,7 +6215,7 @@ istgt_lu_disk_lbwrite_ats(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr l
 	exitblockingcall(endofmacro4)
 	timediffw(lu_cmd, 'D');
 	if (markedForFree == 1 || markedForReturn == 1) {
-		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (ats write:%zd/%zd @%zd)",
+		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (ats write:%" PRId64 "/%" PRId64 " @%" PRId64 ")",
 				conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, nbytes, rc, offset);
 		if (diskIoPendingL == 0 && markedForFree == 1)
 			lu_cmd->connGone = 1;
@@ -6218,7 +6224,7 @@ istgt_lu_disk_lbwrite_ats(ISTGT_LU_DISK *spec, CONN_Ptr conn, ISTGT_LU_CMD_Ptr l
 		return -1;
 	}
 	if (rc < 0 || (uint64_t) rc != nbytes) {
-		errlog(lu_cmd, "c#%d lu_disk_write()ats failed %ld/%lu errno:%d\n", conn->id, rc, nbytes, errno)
+		errlog(lu_cmd, "c#%d lu_disk_write()ats failed %" PRId64 "/%" PRIu64 " errno:%d\n", conn->id, rc, nbytes, errno)
 		xfree(watsbuf);
 		if (freedata == 1) xfree(data);
 		return -1;
@@ -6295,14 +6301,14 @@ istgt_lu_disk_lbsync(ISTGT_LU_DISK *spec, CONN_Ptr conn __attribute__((__unused_
 	exitblockingcall(endofmacro2)
 	timediffw(lu_cmd, 'D');
 	if (markedForFree == 1 || markedForReturn == 1) {
-		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (sync:%zd/%zd @%zd)",
+		ISTGT_TRACELOG(ISTGT_TRACE_NET, "c#%d connGone(%d)OrMarkedReturn(%d):%p:%d pendingIO:%d (sync:%" PRId64 "/%" PRId64 " @%" PRId64 ")",
 				conn->id, markedForFree, markedForReturn, conn, conn->cid, diskIoPendingL, nbytes, rc, offset);
 		if (diskIoPendingL == 0 && markedForFree == 1)
 			lu_cmd->connGone = 1;
 		return -1;
 	}
 	if (rc < 0) {
-		errlog(lu_cmd, "c#%d lu_disk_sync() failed %ld %lu-%lu\n", conn->id, rc, offset, nbytes)
+		errlog(lu_cmd, "c#%d lu_disk_sync() failed %" PRId64 " %" PRIu64 "-%" PRIu64 "\n", conn->id, rc, offset, nbytes)
 		return -1;
 	}
 
@@ -6748,14 +6754,14 @@ istgt_lu_disk_clear_reservation(ISTGT_LU_Ptr lu, int lun)
 		memset(&spec->pr_keys[i], 0, sizeof(spec->pr_keys[i]));
 	}
 	if(spec->persist && spec->spc2_reserved == 0){
-		rc = istgt_lu_disk_update_reservation(spec); 
+		rc = istgt_lu_disk_update_reservation(spec);
 		if (rc < 0) {
 			ISTGT_ERRLOG("istgt_lu_disk_update_reservation() failed\n");
 			/* Copy only if the backup was successful */
 			if (bkp_success == 1) {
 				rc = istgt_lu_disk_copy_reservation(spec, spec_bkp);
 				if (rc < 0) {
-					ISTGT_LOG("istgt_lu_disk_copy_reservation() failed\n");	
+					ISTGT_LOG("istgt_lu_disk_copy_reservation() failed\n");
 				}
 			}
 		}
@@ -6900,7 +6906,7 @@ istgt_lu_disk_stop(ISTGT_LU_Ptr lu, int lun)
 	MTX_LOCK(&spec->state_mutex);
 	spec->ex_state = ISTGT_LUN_CLOSE;
 	MTX_UNLOCK(&spec->state_mutex);
-	ISTGT_LOG("LU%d: LUN%d %s: storage_stop [%ld.%ld - %ld.%ld - %ld.%ld]\n",
+	ISTGT_LOG("LU%d: LUN%d %s: storage_stop [%" PRI_TIME_T ".%" PRI_TIME_T " - %" PRI_TIME_T ".%" PRI_TIME_T " - %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 		lu->num, lun, lu->name ? lu->name  : "-",
 		_s1.tv_sec, _s1.tv_nsec, _s2.tv_sec, _s2.tv_nsec, _s3.tv_sec, _s3.tv_nsec);
 
@@ -6946,7 +6952,7 @@ istgt_lu_disk_modify(ISTGT *istgt, int dofake)
 	}
 	timesdiff(clockid, st,wrk,dif1)
 
-	notyet = signaled;	
+	notyet = signaled;
 
 	while ((notyet > 0) && (++loopCnt < 180)) {
 		sleep(1);
@@ -6964,7 +6970,7 @@ istgt_lu_disk_modify(ISTGT *istgt, int dofake)
 		}
 	}
 	timesdiff(clockid, wrk,wrkx,dif2)
-	ISTGT_LOG("istgtcontrol modify %s done signaled:%d notdone:%d [%ld.%ld - %ld.%ld]\n",
+	ISTGT_LOG("istgtcontrol modify %s done signaled:%d notdone:%d [%" PRI_TIME_T ".%" PRI_TIME_T " - %" PRI_TIME_T ".%" PRI_TIME_T "]\n",
 			mode, signaled, notyet, dif1.tv_sec, dif1.tv_nsec, dif2.tv_sec, dif2.tv_nsec);
 	return  (failsignal || notyet) ? -1 : 0;
 }
@@ -7066,14 +7072,14 @@ istgt_lu_disk_queue_clear_internal(CONN_Ptr conn, ISTGT_LU_DISK *spec, const cha
 			if((abort_release == 1) && ((lu_task->lu_cmd.cdb[0] == SPC2_RELEASE_6) || (lu_task->lu_cmd.cdb[0] == SPC2_RELEASE_10))) {
 				lu_task->lu_cmd.release_aborted = 1;
 				cleared++;
-				ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu Release cleared from cmdq\n",
+				ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " Release cleared from cmdq\n",
 			    		lu_task->lu_cmd.CmdSN,
 			   		lu_task->lu_cmd.cdb[0],
 			    		lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
 			    		(now.tv_sec - lu_task->lu_cmd.create_time.tv_sec));
 				goto saved_cmd_queue;
 			}
-			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared from cmdq\n",
+			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared from cmdq\n",
 			    lu_task->lu_cmd.CmdSN,
 			    lu_task->lu_cmd.cdb[0],
 			    lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7128,14 +7134,14 @@ saved_cmd_queue:
 			if((abort_release == 1) && ((lu_task->lu_cmd.cdb[0] == SPC2_RELEASE_6) || (lu_task->lu_cmd.cdb[0] == SPC2_RELEASE_10))) {
 				lu_task->lu_cmd.release_aborted = 1;
 				cleared++;
-				ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu Release cleared from blockedq\n",
+				ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " Release cleared from blockedq\n",
 			    		lu_task->lu_cmd.CmdSN,
 			   		lu_task->lu_cmd.cdb[0],
 			    		lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
 			    		(now.tv_sec - lu_task->lu_cmd.create_time.tv_sec));
 				goto saved_blocked_queue;
 			}
-			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared from blockedq\n",
+			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared from blockedq\n",
 			    lu_task->lu_cmd.CmdSN,
 			    lu_task->lu_cmd.cdb[0],
 			    lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7192,7 +7198,7 @@ saved_blocked_queue:
 			break;
 		if (((all_cmds != 0) || (lu_task->lu_cmd.CmdSN == CmdSN))
 		    && (lu_task->in_plen == ilen && (strcasecmp(lu_task->in_port, initiator_port) == 0))) {
-			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared from maintcmdq\n",
+			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared from maintcmdq\n",
 			    lu_task->lu_cmd.CmdSN,
 			    lu_task->lu_cmd.cdb[0],
 			    lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7243,7 +7249,7 @@ saved_blocked_queue:
 			break;
 		if (((all_cmds != 0) || (lu_task->lu_cmd.CmdSN == CmdSN))
 		    && (lu_task->in_plen == ilen && (strcasecmp(lu_task->in_port, initiator_port) == 0))) {
-			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared from maintblkdq\n",
+			ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared from maintblkdq\n",
 			    lu_task->lu_cmd.CmdSN,
 			    lu_task->lu_cmd.cdb[0],
 			    lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7301,7 +7307,7 @@ saved_blocked_queue:
 				/* conn had gone? */
 				MTX_LOCK(&lu_task->trans_mutex);
 				{
-					ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu aborted\n",
+					ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " aborted\n",
 					    lu_task->lu_cmd.CmdSN,
 					    lu_task->lu_cmd.cdb[0],
 						lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7331,7 +7337,7 @@ saved_blocked_queue:
 			lu_cmd = &(lu_task->lu_cmd);
 			ln = 0;
 			if(rem > 30)
-	                        ln = snprintf(bp, rem, "%dC0x%x CS%d TA%d.%d TS%d 0x%x(lba:%lx+%x)%lu.%lu[%c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld  %c:%ld.%9.9ld %c:%ld.%9.9ld %c:%ld.%9.9ld] ", i,
+	                        ln = snprintf(bp, rem, "%dC0x%x CS%d TA%d.%d TS%d 0x%x(lba:%" PRIx64 "+%x)%" PRI_TIME_T ".%" PRI_TIME_T "[%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "  %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "] ", i,
                                                         lu_task->lu_cmd.CmdSN, lu_task->lu_cmd.status, lu_task->execute, lu_task->use_cond, spec->luworker_waiting[i],
                                                         lu_task->lu_cmd.cdb[0], lu_task->lu_cmd.lba,
                                                         lu_task->lu_cmd.lblen,
@@ -7346,7 +7352,7 @@ saved_blocked_queue:
                                                         lu_cmd->caller[7] ? lu_cmd->caller[7] : '9', lu_cmd->tdiff[7].tv_sec, lu_cmd->tdiff[7].tv_nsec,
                                                         lu_cmd->caller[8] ? lu_cmd->caller[8] : '9', lu_cmd->tdiff[8].tv_sec, lu_cmd->tdiff[8].tv_nsec
                                                         );
-			if(ln <0) 
+			if(ln <0)
 				ln = 0;
 			else if(ln > rem)
 				ln = rem;
@@ -7379,7 +7385,7 @@ saved_blocked_queue:
 					if(spec->lu_tmf_wait[i] == 1 || already_waited == 1) {
 						if((abort_release == 1) && ((lu_cmd->cdb[0] == SPC2_RELEASE_6) || (lu_cmd->cdb[0] == SPC2_RELEASE_10))) {
 							lu_cmd->release_aborted = 1;
-							ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu Release cleared from blockedq\n",
+							ISTGT_LOG("CmdSN(0x%x), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " Release cleared from blockedq\n",
 			    					lu_cmd->CmdSN,
 			   					lu_cmd->cdb[0],
 			    					lu_cmd->lba, lu_cmd->lblen,
@@ -7408,7 +7414,7 @@ avoidif:
 			ln = 0;
 			if(rem > 30)
 				ln = snprintf(bp, rem, "%dTS%d ", i, spec->luworker_waiting[i]);
-			if(ln < 0) 
+			if(ln < 0)
 				ln = 0;
 			else if(ln > rem)
 				ln = rem;
@@ -7419,7 +7425,7 @@ avoidif:
 		MTX_UNLOCK(&spec->luworker_mutex[i]);
 	}
 	if(conn!=NULL && conn->state != CONN_STATE_EXITING && abort_result_queue == 1) {
-		MTX_LOCK(&conn->result_queue_mutex);    
+		MTX_LOCK(&conn->result_queue_mutex);
 		while ((tptr= (ISTGT_LU_TASK_Ptr)istgt_queue_walk(&conn->result_queue, &cookie)) != NULL) {
 			if(tptr->lu_cmd.CmdSN == CmdSN){
 				tptr->lu_cmd.aborted = 1;
@@ -7608,7 +7614,7 @@ istgt_lu_disk_queue_clear_all(ISTGT_LU_Ptr lu, int lun)
 		lu_task = istgt_queue_dequeue(&spec->cmd_queue);
 		if (lu_task == NULL)
 			break;
-		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared\n",
+		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared\n",
 		    lu_task->lu_cmd.CmdSN,
 		    lu_task->lu_cmd.cdb[0],
 			lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7628,7 +7634,7 @@ istgt_lu_disk_queue_clear_all(ISTGT_LU_Ptr lu, int lun)
 		 lu_task = istgt_queue_dequeue(&spec->blocked_queue);
 		if (lu_task == NULL)
 			break;
-		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared\n",
+		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared\n",
 		    lu_task->lu_cmd.CmdSN,
 		    lu_task->lu_cmd.cdb[0],
 			lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7648,7 +7654,7 @@ istgt_lu_disk_queue_clear_all(ISTGT_LU_Ptr lu, int lun)
 		lu_task = istgt_queue_dequeue(&spec->maint_cmd_queue);
 		if (lu_task == NULL)
 			break;
-		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared\n",
+		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared\n",
 		    lu_task->lu_cmd.CmdSN,
 		    lu_task->lu_cmd.cdb[0],
 			lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7668,7 +7674,7 @@ istgt_lu_disk_queue_clear_all(ISTGT_LU_Ptr lu, int lun)
 		 lu_task = istgt_queue_dequeue(&spec->maint_blocked_queue);
 		if (lu_task == NULL)
 			break;
-		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu cleared\n",
+		ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " cleared\n",
 		    lu_task->lu_cmd.CmdSN,
 		    lu_task->lu_cmd.cdb[0],
 			lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7693,7 +7699,7 @@ istgt_lu_disk_queue_clear_all(ISTGT_LU_Ptr lu, int lun)
 			/* conn had gone? */
 			rc = pthread_mutex_trylock(&lu_task->trans_mutex);
 			if (rc == 0) {
-				ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%lu aborted\n",
+				ISTGT_LOG("CmdSN(%u), OP=0x%x (lba %"PRIu64", %u blocks), ElapsedTime=%" PRI_TIME_T " aborted\n",
 				    lu_task->lu_cmd.CmdSN,
 				    lu_task->lu_cmd.cdb[0],
 				    lu_task->lu_cmd.lba, lu_task->lu_cmd.lblen,
@@ -7794,7 +7800,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 
 	while ((tptr= (ISTGT_LU_TASK_Ptr)istgt_queue_walk(&spec->cmd_queue, &cookie)) != NULL) {
 		tdiff(tptr->lu_cmd.times[0], now, r)
-		wn = snprintf(bptr, brem, " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+		wn = snprintf(bptr, brem, " %d:%x 0x%x.%" PRIu64 "+%uT%" PRI_TIME_T ".%9.9" PRI_TIME_T,
 				i++, tptr->lu_cmd.CmdSN, tptr->lu_cmd.cdb0,
 				tptr->lu_cmd.lba, tptr->lu_cmd.lblen,
 				r.tv_sec, r.tv_nsec);
@@ -7804,7 +7810,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 	cookie = NULL;
 	while ((tptr= (ISTGT_LU_TASK_Ptr)istgt_queue_walk(&spec->blocked_queue, &cookie)) != NULL) {
 		tdiff(tptr->lu_cmd.times[0], now, r)
-		wn = snprintf(bptr, brem, " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+		wn = snprintf(bptr, brem, " %d:%x 0x%x.%" PRIu64 "+%uT%" PRI_TIME_T ".%9.9" PRI_TIME_T,
 				i++, tptr->lu_cmd.CmdSN, tptr->lu_cmd.cdb0,
 				tptr->lu_cmd.lba, tptr->lu_cmd.lblen,
 				r.tv_sec, r.tv_nsec);
@@ -7815,7 +7821,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 	cookie = NULL;
 	while ((tptr= (ISTGT_LU_TASK_Ptr)istgt_queue_walk(&spec->maint_cmd_queue, &cookie)) != NULL) {
 		tdiff(tptr->lu_cmd.times[0], now, r)
-		wn = snprintf(bptr, brem, " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+		wn = snprintf(bptr, brem, " %d:%x 0x%x.%" PRIu64 "+%uT%" PRI_TIME_T ".%9.9" PRI_TIME_T,
 				i++, tptr->lu_cmd.CmdSN, tptr->lu_cmd.cdb0,
 				tptr->lu_cmd.lba, tptr->lu_cmd.lblen,
 				r.tv_sec, r.tv_nsec);
@@ -7825,7 +7831,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 	cookie = NULL;
 	while ((tptr= (ISTGT_LU_TASK_Ptr)istgt_queue_walk(&spec->maint_blocked_queue, &cookie)) != NULL) {
 		tdiff(tptr->lu_cmd.times[0], now, r)
-		wn = snprintf(bptr, brem, " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+		wn = snprintf(bptr, brem, " %d:%x 0x%x.%" PRIu64 "+%uT%" PRI_TIME_T ".%9.9" PRI_TIME_T,
 				i++, tptr->lu_cmd.CmdSN, tptr->lu_cmd.cdb0,
 				tptr->lu_cmd.lba, tptr->lu_cmd.lblen,
 				r.tv_sec, r.tv_nsec);
@@ -7840,7 +7846,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 		MTX_LOCK(&spec->luworker_mutex[i]);
 		if(spec->inflight_io[i] != NULL) {
 			tdiff(spec->inflight_io[i]->lu_cmd.times[0], now, r)
-			wn = snprintf(bptr, brem, " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+			wn = snprintf(bptr, brem, " %d:%x 0x%x.%" PRIu64 "+%uT%" PRI_TIME_T ".%9.9" PRI_TIME_T,
 							i, spec->inflight_io[i]->lu_cmd.CmdSN,
 							spec->inflight_io[i]->lu_cmd.cdb0,
 							spec->inflight_io[i]->lu_cmd.lba,
@@ -7856,7 +7862,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 	for (i=0; i < ISTGT_MAX_NUM_LUWORKERS; i++ ) {
 		if (spec->wait_lu_task[i] != NULL) {
 			tdiff(spec->wait_lu_task[i]->lu_cmd.times[0], now, r)
-			wn = snprintf(bptr, brem, " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+			wn = snprintf(bptr, brem, " %d:%x 0x%x.%" PRIu64 "+%uT%" PRI_TIME_T ".%9.9" PRI_TIME_T,
 					i, spec->wait_lu_task[i]->lu_cmd.CmdSN,
 					spec->wait_lu_task[i]->lu_cmd.cdb0,
 					spec->wait_lu_task[i]->lu_cmd.lba,
@@ -7867,7 +7873,7 @@ istgt_lu_print_q(ISTGT_LU_Ptr lu, int lun)
 	}
 	MTX_UNLOCK(&spec->wait_lu_task_mutex);
 
-	ISTGT_NOTICELOG("LU%d:QUE %s %s [%s, %luGB.%luMB, %lu blks of %lu bytes, phy:%u %s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d inflight:%d %d/%d\n",
+	ISTGT_NOTICELOG("LU%d:QUE %s %s [%s, %" PRIu64 "GB.%" PRIu64 "MB, %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u %s%s%s%s%s%s%s rpm:%d] q:%d thr:%d/%d inflight:%d %d/%d\n",
 				lu->num, lu->name ? lu->name : "-", lu->readonly ? "readonly " : "",
 				spec->file, gb_size, mb_size, spec->blockcnt, spec->blocklen, spec->rshift,
 				spec->readcache ? "" : "RCD", spec->writecache ? " WCE" : "",
@@ -7998,7 +8004,7 @@ istgt_check_for_blockage(ISTGT_LU_TASK_Ptr pending_task, ISTGT_LU_TASK_Ptr ooa_t
 			break;
 	}
 	ISTGT_ERRLOG("Could not find the serialization value %d",
-		serialize_row[pending_entry->seridx]);	
+		serialize_row[pending_entry->seridx]);
 	return (ISTGT_TASK_ERROR);
 }
 
@@ -8018,7 +8024,7 @@ istgt_task_action istgt_check_for_istgt_queue(ISTGT_QUEUE_Ptr queue, ISTGT_LU_TA
 	}
 	return action;
 }
-	
+
 istgt_task_action istgt_check_for_all_luworkers(ISTGT_LU_DISK *spec, ISTGT_LU_TASK_Ptr unblocked_lu_task)
 {
 	int i;
@@ -8107,7 +8113,7 @@ int is_maintenance_io(ISTGT_LU_TASK_Ptr task)
 	}
 	return 0;
 }
-/*If it is a maintenance IO and is blocked we will enqueue it just after the IO 
+/*If it is a maintenance IO and is blocked we will enqueue it just after the IO
 which is blocking it in complete queue, else normal enqueue at the end
 */
 static istgt_task_action
@@ -8136,7 +8142,7 @@ istgt_is_exec_pipeline_conflict(ISTGT_LU_DISK *spec, ISTGT_LU_TASK_Ptr pending_t
 		case ISTGT_TASK_OVERLAP_TAG:
 		case ISTGT_TASK_ERROR:
 		case ISTGT_TASK_BLOCK_SUSPECT:
-			if(is_maintenance_io(pending_task)) { 
+			if(is_maintenance_io(pending_task)) {
 				r_ptr = istgt_queue_enqueue_after(&spec->complete_queue, pending_task->blocked_by, pending_task);
 				pending_task->blocked_by = NULL;
 				pending_task->complete_queue_ptr = r_ptr;
@@ -8160,13 +8166,13 @@ istgt_is_exec_pipeline_conflict(ISTGT_LU_DISK *spec, ISTGT_LU_TASK_Ptr pending_t
 	}
 	return (ISTGT_TASK_PASS);
 }
-/*Scheduling maintenance commands--If the first cmd in the complete queue is maint, 
+/*Scheduling maintenance commands--If the first cmd in the complete queue is maint,
 we will find that command in the maint_blocked_queue and move it to maint_cmd_queue.
- 
+
 Scheduling normal commands --We examine utmost 2 blocked entries so as not to have a n*2 unblocking. Eventually
-every 1 request ejected out of the cmd queue would inturn schedule 2 requests and 
+every 1 request ejected out of the cmd queue would inturn schedule 2 requests and
 hence we have a exponential reschedules for blocked items. This will drain the blocked
-queue in reasonable time 
+queue in reasonable time
 */
 
 void
@@ -8181,7 +8187,7 @@ istgt_schedule_blocked_requests(ISTGT_LU_DISK *spec, ISTGT_QUEUE_Ptr cmd_queue, 
 
 	if(spec == NULL || cmd_queue == NULL || blocked_queue == NULL)
 		return;
-	/*Since we have only one maintenance thread*/ 
+	/*Since we have only one maintenance thread*/
 	if( maint == 1) {
 		if((lu_task = (ISTGT_LU_TASK_Ptr)istgt_queue_walk(&spec->complete_queue, &cookie1))) {
 			if(is_maintenance_io(lu_task)) {
@@ -8366,7 +8372,7 @@ istgt_lu_disk_queue(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 			ISTGT_ERRLOG("lu_destroy_task() failed\n");
 			return -1;
 		}
-		if(spec->schdler_cmd_waiting) { 
+		if(spec->schdler_cmd_waiting) {
 			rc = pthread_cond_signal(&spec->cmd_queue_cond);
 		}
 		if (rc < 0) {
@@ -8455,7 +8461,7 @@ istgt_lu_disk_queue(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 			break;
 	}
 	if (r_ptr == NULL) {
-		ISTGT_ERRLOG("LU%d: Queue%s enqerror(%s)(q:%d/%d %d) CmdSN=%u,0x%x.%lu+%u\n",
+		ISTGT_ERRLOG("LU%d: Queue%s enqerror(%s)(q:%d/%d %d) CmdSN=%u,0x%x.%" PRIu64 "+%u\n",
 				lu->num, qact[sindx < 0 || sindx > 6 ? 7 : sindx], msg, ccnt, bcnt, icnt, lu_cmd->CmdSN, lu_cmd->cdb[0], lu_cmd->lba, lu_cmd->lblen);
 error_return:
 		istgt_queue_dequeue_middle(&spec->complete_queue, lu_task->complete_queue_ptr);
@@ -8470,7 +8476,7 @@ error_return_no_dequeue:
 /* should we send error back to client? */
 		return -1;
 	}
-	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI, "LU%d: Queue%s (%s)(q:%d/%d %d) CmdSN=%u,0x%x.%lu+%u\n",
+	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI, "LU%d: Queue%s (%s)(q:%d/%d %d) CmdSN=%u,0x%x.%" PRIu64 "+%u\n",
 		lu->num, qact[sindx < 0 || sindx > 6 ? 7 : sindx], msg, ccnt, bcnt, icnt, lu_cmd->CmdSN, lu_cmd->cdb[0], lu_cmd->lba, lu_cmd->lblen);
 
 	/* notify LUN thread */
@@ -8741,7 +8747,7 @@ istgt_lu_disk_queue_start(ISTGT_LU_Ptr lu, int lun, int worker_id)
 	spec->luworker_exit_arg[worker_id].spec = spec;
 	spec->luworker_exit_arg[worker_id].workerid = worker_id;
 	spec->luworker_exit_arg[worker_id].lu_task = lu_task;
-	
+
 	pthread_cleanup_push(luworker_exit, &(spec->luworker_exit_arg[worker_id]));
 	lu_task->thread = pthread_self();
 	conn = lu_task->conn;
@@ -8768,7 +8774,7 @@ istgt_lu_disk_queue_start(ISTGT_LU_Ptr lu, int lun, int worker_id)
 		if (lu_cmd->pdu->data_segment_len >= lu_cmd->transfer_len) {
 			i = ++lu_cmd->iobufindx;
 			ISTGT_TRACELOG(ISTGT_TRACE_SCSI,
-			    "c#%d LU%d: CSN:0x%x LUN%d Task Write Immediate Start, op:0x%x [%d,%lu->%lu]\n",
+			    "c#%d LU%d: CSN:0x%x LUN%d Task Write Immediate Start, op:0x%x [%d,%zu->%zu]\n",
 			    conn->id, lu->num, CmdSN, lun, opcode,
 				i, lu_cmd->iobuf[i].iov_len, lu_cmd->pdu->data_segment_len);
 			lu_cmd->iobuf[i].iov_base = lu_cmd->pdu->data;
@@ -8871,7 +8877,7 @@ istgt_lu_disk_queue_start(ISTGT_LU_Ptr lu, int lun, int worker_id)
 			start = now = time(NULL);
 			abstime.tv_sec = now + lu_task->condwait; // / 1000);
 			abstime.tv_nsec = 0; //(lu_task->condwait % 1000) * 1000000;
-			
+
 			MTX_LOCK(&spec->wait_lu_task_mutex);
 			spec->wait_lu_task[worker_id] = lu_task;
 			MTX_UNLOCK(&spec->wait_lu_task_mutex);
@@ -9052,7 +9058,7 @@ istgt_lu_disk_queue_start(ISTGT_LU_Ptr lu, int lun, int worker_id)
 	goto return_retval;
 
 error_return:
-	INFLIGHT_IO_CLEANUP;	
+	INFLIGHT_IO_CLEANUP;
 error_return_no_cleanup:
 	if (lu_cmd && conn && lu_cmd->connGone == 1) {
 		ISTGT_ERRLOG("c#%d LU%d: LUN%d connGone set, error:%s, op:0x%x cmdSN:0x%x (ret:%d)\n",
@@ -9091,11 +9097,11 @@ istgt_lu_disk_busy_excused(int opcode)
 			break;
 	}
 	return ret;
-	
+
 }
 #define checklength \
 	if(transfer_len*spec->blocklen > (uint64_t)lu->MaxBurstLength) { \
-		ISTGT_WARNLOG("c#%d checklength error: transferlen %lu should be < maxburstlen %lu\n", \
+		ISTGT_WARNLOG("c#%d checklength error: transferlen %" PRIu64 " should be < maxburstlen %" PRIu64 "\n", \
 			conn->id, transfer_len*spec->blocklen, (uint64_t)(lu->MaxBurstLength)); \
 		lu_cmd->status = ISTGT_SCSI_STATUS_CHECK_CONDITION; \
 		BUILD_SENSE(ILLEGAL_REQUEST, 0x24, 0x00);\
@@ -9323,7 +9329,7 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 			lu_cmd->data_len = DMIN32((size_t)data_len, lu_cmd->transfer_len);
 			lu_cmd->status = ISTGT_SCSI_STATUS_GOOD;
 
-			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d REPORT_LUNS sel:%x len:%lu (%d/%u/%u)\n",
+			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d REPORT_LUNS sel:%x len:%zu (%d/%u/%u)\n",
 					conn->id, sel, lu_cmd->data_len, data_len, lu_cmd->transfer_len, allocation_len);
 		}
 		break;
@@ -9377,10 +9383,10 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 		data = lu_cmd->data = xmalloc(200);
 		if (spec->blockcnt - 1 > 0xffffffffULL) {
 			DSET32(&data[0], 0xffffffffUL);
-			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d READ_CAPACITY_10 blklen:%lu\n", conn->id, spec->blocklen);
+			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d READ_CAPACITY_10 blklen:%" PRIu64 "\n", conn->id, spec->blocklen);
 		} else {
 			DSET32(&data[0], (uint32_t) (spec->blockcnt - 1));
-			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d READ_CAPACITY_10 blkcnt:%lu blklen:%lu\n", conn->id, spec->blockcnt, spec->blocklen);
+			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d READ_CAPACITY_10 blkcnt:%" PRIu64 " blklen:%" PRIu64 "\n", conn->id, spec->blockcnt, spec->blocklen);
 		}
 		DSET32(&data[4], (uint32_t) spec->blocklen);
 		tptr = (uint64_t *)&(data[8]);
@@ -9408,7 +9414,7 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 				lu_cmd->status = ISTGT_SCSI_STATUS_CHECK_CONDITION;
 				return -1;
 			}
- 			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d READ_CAPACITY_16 blkcnt:%lu  blklen:%lu rshift:%u/%u %s\n",
+ 			ISTGT_TRACELOG(ISTGT_TRACE_SCSI, "c#%d READ_CAPACITY_16 blkcnt:%" PRIu64 "  blklen:%" PRIu64 " rshift:%u/%u %s\n",
  					conn->id, spec->blockcnt, spec->blocklen, spec->rshift, spec->rshiftreal, spec->unmap ? "thin" : "-");
 
 			data_len = 32;
@@ -9424,7 +9430,7 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
  			//	BDSET8W(&data[13], spec->rshift, 3, 4);
 			if (spec->unmap)
 				data[14] = 0x80;
-			else 
+			else
 				data[14] = 0;
 			data[15] = 0;
 			tptr = (uint64_t *)(&(data[16]));
@@ -10900,8 +10906,8 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 			msg = "(CheckCond_on_fake changed to Busy)"; dolog = 1;
 			lu_cmd->status = ISTGT_SCSI_STATUS_BUSY;
 		}
-	
-#if 0 
+
+#if 0
 		else if(lu_cmd->status == ISTGT_SCSI_STATUS_GOOD && spec->state != ISTGT_LUN_BUSY) {
 			/* Read/Write the reservation from/to ZAP if previously failed */
 			if(spec->persist){
@@ -10929,7 +10935,7 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 #endif
 	if (dolog == 1) {
 	ISTGT_LOG(
-		"c#%d LU%d.%lx: CSN:%x OP=0x%x/%x (%lu+%u) complete [%c:%ld.%9.9ld %c:%ld.%9.9ld]%s\n",
+		"c#%d LU%d.%" PRIx64 ": CSN:%x OP=0x%x/%x (%" PRIu64 "+%u) complete [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]%s\n",
 	    	conn->id, lunum, lu_cmd->lun, lu_cmd->CmdSN, cdb[0], lu_cmd->status, lu_cmd->lba, lu_cmd->lblen,
 		lu_cmd->caller[lu_cmd->_andx > 1 ? lu_cmd->_andx - 2 : 0],
 		lu_cmd->tdiff[lu_cmd->_andx > 1 ? lu_cmd->_andx - 2 : 0].tv_sec,
@@ -10940,7 +10946,7 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 		msg);
 	} else {
 	ISTGT_TRACELOG(ISTGT_TRACE_ISCSI,
-		"c#%d LU%d.%lx: CSN:%x OP=0x%x/%x (%lu+%u) complete [%c:%ld.%9.9ld %c:%ld.%9.9ld]%s\n",
+		"c#%d LU%d.%" PRIx64 ": CSN:%x OP=0x%x/%x (%" PRIu64 "+%u) complete [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]%s\n",
 	    	conn->id, lunum, lu_cmd->lun, lu_cmd->CmdSN, cdb[0], lu_cmd->status, lu_cmd->lba, lu_cmd->lblen,
 		lu_cmd->caller[lu_cmd->_andx > 1 ? lu_cmd->_andx - 2 : 0],
 		lu_cmd->tdiff[lu_cmd->_andx > 1 ? lu_cmd->_andx - 2 : 0].tv_sec,
@@ -10954,4 +10960,3 @@ istgt_lu_disk_execute(CONN_Ptr conn, ISTGT_LU_CMD_Ptr lu_cmd)
 		xfree(data);
 	return 0;
 }
-

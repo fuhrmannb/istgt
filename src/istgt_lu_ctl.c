@@ -48,6 +48,12 @@
 #include <inttypes.h>
 #include <stdint.h>
 
+#ifdef LONG_LONG_TIME_T
+#define PRI_TIME_T "lld"
+#else
+#define PRI_TIME_T "ld"
+#endif
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -655,10 +661,10 @@ istgt_uctl_cmd_resize(UCTL_Ptr uctl)
 	}
 	if ((new_size % replica_block_size) != 0) {
 		ISTGT_ERRLOG("failed to resize volume %s new size %s "
-			"is not in multiples of block length %lu\n",
+			"is not in multiples of block length %" PRIu64 "\n",
 			volname, size_str, spec->blocklen);
 		istgt_uctl_snprintf(uctl, "ERR new size %s is "
-			"not in multiples of block length %lu\n", size_str, spec->blocklen);
+			"not in multiples of block length %" PRIu64 "\n", size_str, spec->blocklen);
 		goto error_return;
 	}
 	if (old_size == new_size) {
@@ -861,7 +867,7 @@ istgt_uctl_cmd_max_io_wait(UCTL_Ptr uctl)
 	}
 
 	max_wait_time = istgt_get_max_io_wait_time();
-	istgt_uctl_snprintf(uctl, "%s  %lu\n", uctl->cmd, max_wait_time);
+	istgt_uctl_snprintf(uctl, "%s  %" PRIu64 "\n", uctl->cmd, max_wait_time);
 	rc = istgt_uctl_writeline(uctl);
 	if (rc != UCTL_CMD_OK) {
 		return (rc);
@@ -2360,7 +2366,7 @@ istgt_uctl_cmd_log(UCTL_Ptr uctl)
 	if (g_logdelayns < 1)
 		g_logdelayns = 0;
 
-	ISTGT_LOG("cmd_log[%s] trace:%x->%x  delayedlog:%d->%d  us:%ld->%ld\n",
+	ISTGT_LOG("cmd_log[%s] trace:%x->%x  delayedlog:%d->%d  us:%" PRId64 "->%" PRId64 "\n",
 	    uctl->cmd, oldtrace, g_trace_flag,
 	    oldlogtimes, g_logtimes,
 	    olddelayms > 0 ? olddelayms/1000: 0,
@@ -2368,7 +2374,7 @@ istgt_uctl_cmd_log(UCTL_Ptr uctl)
 
 	istgt_uctl_snprintf(uctl,
 	    "OK cmd_log[%s] trace:%x->%x  "
-	    "delayedlog:%d->%d  ms:%ld->%ld\n",
+	    "delayedlog:%d->%d  ms:%" PRId64 "->%" PRId64 "\n",
 	    uctl->cmd, oldtrace, g_trace_flag,
 	    oldlogtimes, g_logtimes,
 	    olddelayms > 0 ? olddelayms/1000000: 0,
@@ -2655,11 +2661,11 @@ istgt_uctl_cmd_maxtime(UCTL_Ptr uctl)
 			if (spec->IO_size[ind].write.total_time.tv_sec != 0 ||
 			    spec->IO_size[ind].write.total_time.tv_nsec != 0) {
 				istgt_uctl_snprintf(uctl,
-				    "%s WR       |%10lu + %4lu| %ld.%9.9ld"
-				    " [%c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld]\n",
+				    "%s WR       |%10" PRIu64 " + %4" PRIu64 "| %" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]\n",
 				    uctl->cmd, spec->IO_size[ind].write.lba,
 				    spec->IO_size[ind].write.lblen,
 				    spec->IO_size[ind].write.total_time.tv_sec,
@@ -2715,11 +2721,11 @@ istgt_uctl_cmd_maxtime(UCTL_Ptr uctl)
 			if (spec->IO_size[ind].read.total_time.tv_sec != 0 ||
 			    spec->IO_size[ind].read.total_time.tv_nsec != 0) {
 				istgt_uctl_snprintf(uctl,
-				    "%s RD       |%10lu + %4lu| %ld.%9.9ld"
-				    " [%c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld]\n",
+				    "%s RD       |%10" PRIu64 " + %4" PRIu64 "| %" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]\n",
 				    uctl->cmd, spec->IO_size[ind].read.lba,
 				    spec->IO_size[ind].read.lblen,
 				    spec->IO_size[ind].read.total_time.tv_sec,
@@ -2777,11 +2783,11 @@ istgt_uctl_cmd_maxtime(UCTL_Ptr uctl)
 			    spec->IO_size[ind].cmp_n_write.total_time.tv_nsec
 				    != 0) {
 				istgt_uctl_snprintf(uctl,
-				    "%s CMP_n_WR |%10lu + %4lu| %ld.%9.9ld"
-				    " [%c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld]\n",
+				    "%s CMP_n_WR |%10" PRIu64 " + %4" PRIu64 "| %" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]\n",
 				    uctl->cmd,
 				    spec->IO_size[ind].cmp_n_write.lba,
 				    spec->IO_size[ind].cmp_n_write.lblen,
@@ -2864,11 +2870,11 @@ istgt_uctl_cmd_maxtime(UCTL_Ptr uctl)
 			if (spec->IO_size[ind].unmp.total_time.tv_sec != 0 ||
 			    spec->IO_size[ind].unmp.total_time.tv_nsec != 0) {
 				istgt_uctl_snprintf(uctl,
-				    "%s UNMP     |%10lu + %4lu| %ld.%9.9ld"
-				    " [%c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld]\n",
+				    "%s UNMP     |%10" PRIu64 " + %4" PRIu64 "| %" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]\n",
 				    uctl->cmd, spec->IO_size[ind].unmp.lba,
 				    spec->IO_size[ind].unmp.lblen,
 				    spec->IO_size[ind].unmp.total_time.tv_sec,
@@ -2926,11 +2932,11 @@ istgt_uctl_cmd_maxtime(UCTL_Ptr uctl)
 			    spec->IO_size[ind]
 				    .write_same.total_time.tv_nsec != 0) {
 				istgt_uctl_snprintf(uctl,
-				    "%s WR_SAME  |%10lu + %4lu| %ld.%9.9ld"
-				    " [%c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld"
-				    " %c:%ld.%9.9ld %c:%ld.%9.9ld]\n",
+				    "%s WR_SAME  |%10" PRIu64 " + %4" PRIu64 "| %" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " [%c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T
+				    " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T " %c:%" PRI_TIME_T ".%9.9" PRI_TIME_T "]\n",
 				    uctl->cmd,
 				    spec->IO_size[ind].write_same.lba,
 				    spec->IO_size[ind].write_same.lblen,
@@ -3100,27 +3106,27 @@ istgt_uctl_cmd_dump(UCTL_Ptr uctl)
 			}
 		} while (1);
 		switch (count) {
-			case 0: snprintf(c_size, 100, "%lu.%lu%c",
+			case 0: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'B'); break;
-			case 1: snprintf(c_size, 100, "%lu.%lu%c",
+			case 1: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'K'); break;
-			case 2: snprintf(c_size, 100, "%lu.%lu%c",
+			case 2: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'M'); break;
-			case 3: snprintf(c_size, 100, "%lu.%lu%c",
+			case 3: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'G'); break;
-			case 4: snprintf(c_size, 100, "%lu.%lu%c",
+			case 4: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'T'); break;
-			case 5: snprintf(c_size, 100, "%lu.%lu%c",
+			case 5: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'P'); break;
-			case 6: snprintf(c_size, 100, "%lu.%lu%c",
+			case 6: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'E'); break;
-			case 7: snprintf(c_size, 100, "%lu.%lu%c",
+			case 7: snprintf(c_size, 100, "%" PRIu64 ".%" PRIu64 "%c",
 			    temp_s, temp_s2, 'Z'); break;
 		}
 		if (detail == 1)
 			istgt_uctl_snprintf(uctl,
 			    "%s LUN LU%d %s Luworkers:%d Qdepth:%d Size:%s"
-			    " Blocklength:%lu PhysRecordLength:%d Unmap:%s"
+			    " Blocklength:%" PRIu64 " PhysRecordLength:%d Unmap:%s"
 			    " Wzero:%s ATS:%s XCOPY:%s %s CONNECTIONS:%d\n",
 			    uctl->cmd, lu->num, lu->name, lu->luworkers,
 			    lu->queue_depth, c_size,
@@ -3411,7 +3417,7 @@ istgt_uctl_cmd_que(UCTL_Ptr uctl)
 		    istgt_queue_walk(&spec->cmd_queue, &cookie)) != NULL) {
 			tdiff(tptr->lu_cmd.times[0], now, r)
 			wn = snprintf(bptr, brem,
-			    " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+			    " %d:%x 0x%x.%" PRIu64 "+%uT%" PRId64 ".%9.9ld",
 			    i++, tptr->lu_cmd.CmdSN, tptr->lu_cmd.cdb0,
 			    tptr->lu_cmd.lba, tptr->lu_cmd.lblen,
 			    r.tv_sec, r.tv_nsec);
@@ -3423,7 +3429,7 @@ istgt_uctl_cmd_que(UCTL_Ptr uctl)
 		    istgt_queue_walk(&spec->blocked_queue, &cookie)) != NULL) {
 			tdiff(tptr->lu_cmd.times[0], now, r)
 			wn = snprintf(bptr, brem,
-			    " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+			    " %d:%x 0x%x.%" PRIu64 "+%uT%" PRId64 ".%9.9ld",
 			    i++, tptr->lu_cmd.CmdSN, tptr->lu_cmd.cdb0,
 			    tptr->lu_cmd.lba, tptr->lu_cmd.lblen,
 			    r.tv_sec, r.tv_nsec);
@@ -3440,7 +3446,7 @@ istgt_uctl_cmd_que(UCTL_Ptr uctl)
 				tdiff(spec->inflight_io[i]->lu_cmd.times[0],
 				    now, r)
 				wn = snprintf(bptr, brem,
-				    " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+				    " %d:%x 0x%x.%" PRIu64 "+%uT%" PRId64 ".%9.9ld",
 				    i, spec->inflight_io[i]->lu_cmd.CmdSN,
 				    spec->inflight_io[i]->lu_cmd.cdb0,
 				    spec->inflight_io[i]->lu_cmd.lba,
@@ -3459,7 +3465,7 @@ istgt_uctl_cmd_que(UCTL_Ptr uctl)
 				tdiff(spec->wait_lu_task[i]->lu_cmd.times[0],
 				    now, r)
 				wn = snprintf(bptr, brem,
-				    " %d:%x 0x%x.%lu+%uT%ld.%9.9ld",
+				    " %d:%x 0x%x.%" PRIu64 "+%uT%" PRId64 ".%9.9ld",
 				    i, spec->wait_lu_task[i]->lu_cmd.CmdSN,
 				    spec->wait_lu_task[i]->lu_cmd.cdb0,
 				    spec->wait_lu_task[i]->lu_cmd.lba,
@@ -3474,8 +3480,8 @@ istgt_uctl_cmd_que(UCTL_Ptr uctl)
 		unlocked = 1;
 
 		ISTGT_TRACELOG(ISTGT_TRACE_CMD,
-		    "LU%d:QUE %s %s Q[%d %d %d %d] q:%d thr:%d/%d [sz:%lu,"
-		    " %lu blks of %lu bytes, phy:%u %s%s] er_cnt:%d\n",
+		    "LU%d:QUE %s %s Q[%d %d %d %d] q:%d thr:%d/%d [sz:%" PRIu64 ","
+		    " %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u %s%s] er_cnt:%d\n",
 		    lu->num, lu->name ? lu->name : "-",
 		    (spec->fd != -1) ? "on" : "off", cq, bq, inf, inflight,
 		    spec->queue_depth, spec->luworkers, spec->luworkersActive,
@@ -3485,8 +3491,8 @@ istgt_uctl_cmd_que(UCTL_Ptr uctl)
 		    spec->error_count);
 
 		istgt_uctl_snprintf(uctl,
-		    "%s LU%d:%s %s Q[%d %d %d %d] q:%d thr:%d/%d [sz:%lu,"
-		    " %lu blks of %lu bytes, phy:%u %s%s] er_cnt:%d\n",
+		    "%s LU%d:%s %s Q[%d %d %d %d] q:%d thr:%d/%d [sz:%" PRIu64 ","
+		    " %" PRIu64 " blks of %" PRIu64 " bytes, phy:%u %s%s] er_cnt:%d\n",
 		    uctl->cmd, lu->num, lu->name ? lu->name : "-",
 		    (spec->fd != -1) ? "on" : "off", cq, bq, inf, inflight,
 		    spec->queue_depth, spec->luworkers, spec->luworkersActive,
@@ -4002,7 +4008,7 @@ uctlworker(void *arg)
 	UCTL_Ptr uctl = (UCTL_Ptr) arg;
 	int rc;
 	pthread_t self = pthread_self();
-	snprintf(tinfo, sizeof (tinfo), "u#%d.%ld",
+	snprintf(tinfo, sizeof (tinfo), "u#%d.%" PRId64 "",
 	    uctl->sock, (uint64_t)(((uint64_t *)self)[0]));
 #ifdef HAVE_PTHREAD_SET_NAME_NP
 	pthread_set_name_np(pthread_self(), tinfo);

@@ -15,6 +15,7 @@
  */
 
 #include <config.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -70,7 +71,7 @@ uint64_t replication_factor = 0;
 static void
 sig_handler(int sig)
 {
-	printf("read IOs:%lu write IOs:%lu\n", read_ios, write_ios);
+	printf("read IOs:%" PRIu64 " write IOs:%" PRIu64 "\n", read_ios, write_ios);
 }
 
 static int
@@ -653,7 +654,7 @@ again:
 					retry = false;
 				}
 				if (count != sizeof (zvol_io_hdr_t)) {
-					REPLICA_ERRLOG("Failed to read complete header.. got only %ld bytes out of %lu\n",
+					REPLICA_ERRLOG("Failed to read complete header.. got only %" PRId64 " bytes out of %zu\n",
 					    count, sizeof (zvol_io_hdr_t));
 					rc = -1;
 					goto error;
@@ -663,12 +664,12 @@ again:
 					mgmt_data = malloc(mgmtio->len);
 					count = test_read_data(events[i].data.fd, (uint8_t *)mgmt_data, mgmtio->len);
 					if (count < 0) {
-						REPLICA_ERRLOG("Failed to read from %d for len %lu and opcode %d\n",
+						REPLICA_ERRLOG("Failed to read from %d for len %" PRIu64 " and opcode %d\n",
 						    events[i].data.fd, mgmtio->len, mgmtio->opcode);
 						rc = -1;
 						goto error;
 					} else if ((uint64_t)count != mgmtio->len) {
-						REPLICA_ERRLOG("failed to getch mgmt data.. got only %ld bytes out of %lu\n",
+						REPLICA_ERRLOG("failed to getch mgmt data.. got only %" PRId64 " bytes out of %" PRIu64 "\n",
 						    count, mgmtio->len);
 						rc = -1;
 						goto error;
@@ -874,8 +875,8 @@ execute_io:
 						}
 
 						if (nbytes != io_hdr->len) {
-							REPLICA_ERRLOG("failed to read completed data from %s off:%lu "
-							    "req:%lu read:%lu replica(%d)\n",
+							REPLICA_ERRLOG("failed to read completed data from %s off:%" PRIu64 " "
+							    "req:%" PRIu64 " read:%" PRIu64 " replica(%d)\n",
 							    test_vol, io_hdr->offset, io_hdr->len, nbytes, ctrl_port);
 							free(user_data);
 							goto error;
@@ -904,7 +905,7 @@ execute_io:
 	}
 
 error:
-	REPLICA_ERRLOG("shutting down replica(%s:%d) IOs(read:%lu write:%lu)\n",
+	REPLICA_ERRLOG("shutting down replica(%s:%d) IOs(read:%" PRIu64 " write:%" PRIu64 ")\n",
 	    replica_ip, replica_port, read_ios, write_ios);
 	if (data)
 		free(data);

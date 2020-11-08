@@ -358,7 +358,7 @@ poolprint(char *inbuf __attribute__((__unused__)),
 	for (i = 0; i < 50; ++i) {
 		if (mpools[i].bucksize == 0)
 			continue;
-		ISTGT_NOTICELOG("%2d: m:%9d  %7d,%5d,%5d %5d   %ld,%ld",
+		ISTGT_NOTICELOG("%2d: m:%9d  %7d,%5d,%5d %5d   %" PRId64 ",%" PRId64,
 		i, mpools[i].objsize, mpools[i].bucksize,
 		mpools[i].inuse, mpools[i].maxuse,
 		mpools[i].fail, mpools[i].allocs, mpools[i].frees);

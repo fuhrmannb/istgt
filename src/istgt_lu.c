@@ -1790,7 +1790,7 @@ istgt_lu_add_unit(ISTGT_Ptr istgt, CF_SECTION *sp)
 			trusty_replica->zvol_guid = (uint64_t) strtoul(val, NULL, 10);
 			TAILQ_INSERT_TAIL(&lu->trusty_replicas, trusty_replica, next);
 			ISTGT_LOG("trusty replica key {%s} and"
-			    " zvol guid {%lu}\n",trusty_replica->replica_id, trusty_replica->zvol_guid);
+			    " zvol guid {%" PRIu64 "}\n",trusty_replica->replica_id, trusty_replica->zvol_guid);
 		}
 	}
 	// It is useful in case where multiple copies of data
@@ -2285,7 +2285,7 @@ istgt_lu_add_unit(ISTGT_Ptr istgt, CF_SECTION *sp)
 		}
 		if (gotstorage == 1) {
 			ISTGT_TRACELOG(ISTGT_TRACE_SCSI,
-					"Lu%d: LUN%d: ADD Storage:%s, size=%lu rsz:%u que:%d rpm:%d %s%s%s%s%s%s%s\n",
+					"Lu%d: LUN%d: ADD Storage:%s, size=%" PRIu64 " rsz:%u que:%d rpm:%d %s%s%s%s%s%s%s\n",
 					lu->num, i, lu->lun[i].u.storage.file, lu->lun[i].u.storage.size,
 					lu->lun[i].u.storage.rsize, lu->queue_depth, lu->lun[i].rotationrate,
 					lu->lun[i].readcache ? "" : "RCD",
@@ -2377,7 +2377,7 @@ error_return:
 	}
 #ifdef REPLICATION
 	/* Releasing in memory details */
-	while (trusty_replica = TAILQ_FIRST(&lu->trusty_replicas)) {
+	while ((trusty_replica = TAILQ_FIRST(&lu->trusty_replicas))) {
                 TAILQ_REMOVE(&lu->trusty_replicas, trusty_replica, next);
                 xfree(trusty_replica);
         }
@@ -2896,7 +2896,7 @@ istgt_lu_update_unit(ISTGT_LU_Ptr lu, CF_SECTION *sp)
 		}
 		/* update the quota */
 		if ((storagechange != 0) && (lu->lun[i].type == ISTGT_LU_LUN_TYPE_STORAGE)) {
-			ISTGT_NOTICELOG("LU%d: LUN%d: UPD Storage:%s, size=%lu rsz=%u rpm:%d %s%s%s%s%s%s%s%s\n",
+			ISTGT_NOTICELOG("LU%d: LUN%d: UPD Storage:%s, size=%" PRIu64 " rsz=%u rpm:%d %s%s%s%s%s%s%s%s\n",
 					lu->num, i, lu->lun[i].u.storage.file, lu->lun[i].u.storage.size,
 					lu->lun[i].u.storage.rsize, lu->lun[i].rotationrate,
 					lu->lun[i].readcache ? "" : "RCD",
@@ -2917,7 +2917,7 @@ istgt_lu_update_unit(ISTGT_LU_Ptr lu, CF_SECTION *sp)
 				rc = istgt_lu_disk_open(lu, i);
 			}
 			if (rc < 0 && !lu->istgt->OperationalMode) {
-				ISTGT_ERRLOG("logical unit update error, retry with old values (size:%lu rsize:%u)\n", old_size, old_rsize);
+				ISTGT_ERRLOG("logical unit update error, retry with old values (size:%" PRIu64 " rsize:%u)\n", old_size, old_rsize);
 				lu->lun[i].u.storage.size = old_size;
 				lu->lun[i].u.storage.rsize = old_rsize;
 				flags = lu->readonly ? O_RDONLY : O_RDWR;
@@ -4282,7 +4282,7 @@ maintenance_io_worker(void *arg)
 	i = lu->luworkers + 0;
 	if (lu->maintenance_thread == self) {
 		tind = i;
-		snprintf(tinfo, sizeof (tinfo), "mt#%d.%ld.%d", lu->num, (uint64_t)(((uint64_t *)self)[0]), i);
+		snprintf(tinfo, sizeof (tinfo), "mt#%d.%" PRId64 ".%d", lu->num, (uint64_t)(((uint64_t *)self)[0]), i);
 		pthread_set_name_np(lu->maintenance_thread, tinfo);
 		for (j = 0; j < lu->maxlun; j++) {
 			spec = (ISTGT_LU_DISK *) lu->lun[j].spec;
@@ -4486,7 +4486,7 @@ luworker(void *arg)
 	for (i = 0; i < lu->luworkers; i++) {
 		if (lu->luthread[i] == self) {
 			tind = i;
-			snprintf(tinfo, sizeof (tinfo), "l#%d.%ld.%d", lu->num, (uint64_t)(((uint64_t *)self)[0]), i);
+			snprintf(tinfo, sizeof (tinfo), "l#%d.%" PRId64 ".%d", lu->num, (uint64_t)(((uint64_t *)self)[0]), i);
 			pthread_set_name_np(lu->luthread[i], tinfo);
 			for (j = 0; j < lu->maxlun; j++) {
 				spec = (ISTGT_LU_DISK *) lu->lun[j].spec;
@@ -4692,7 +4692,7 @@ luscheduler(void *arg)
 
 
 	pthread_t sf = pthread_self();
-	snprintf(tinfo, sizeof (tinfo), "sh#%d.%ld.%d", lu->num, (uint64_t)(((uint64_t *)sf)[0]), 0);
+	snprintf(tinfo, sizeof (tinfo), "sh#%d.%" PRId64 ".%d", lu->num, (uint64_t)(((uint64_t *)sf)[0]), 0);
 	pthread_set_name_np(lu->schdler_thread, tinfo);
 	while (istgt_get_state(lu->istgt) != ISTGT_STATE_RUNNING) {
 		if (istgt_get_state(lu->istgt) == ISTGT_STATE_EXITING ||
